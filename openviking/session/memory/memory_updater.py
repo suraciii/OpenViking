@@ -504,19 +504,22 @@ class MemoryUpdater:
 
         for uri in uris_to_vectorize:
             try:
-                # Read the memory file to get content
                 content = await viking_fs.read_file(uri, ctx=ctx) or ""
 
-                # Use parse_memory_file_with_fields to strip MEMORY_FIELDS comment
                 parsed = parse_memory_file_with_fields(content)
                 abstract = parsed.get("content", "")
 
-                # Get parent URI
+                from openviking_cli.utils.config import get_openviking_config
+                from openviking.utils.embedding_utils import _truncate_embedding_input
+
+                embedding_cfg = get_openviking_config().embedding
+                max_input_tokens = int(getattr(embedding_cfg, "max_input_tokens", 4096) or 4096)
+                vectorize_text = _truncate_embedding_input(abstract, max_input_tokens)
+
                 from openviking_cli.utils.uri import VikingURI
 
                 parent_uri = VikingURI(uri).parent.uri
 
-                # Create Context for vectorization
                 from openviking.core.context import Context, ContextLevel, Vectorize
                 from openviking.storage.queuefs.embedding_msg_converter import EmbeddingMsgConverter
 
@@ -530,7 +533,7 @@ class MemoryUpdater:
                     user=ctx.user,
                     account_id=ctx.account_id,
                 )
-                memory_context.set_vectorize(Vectorize(text=content))
+                memory_context.set_vectorize(Vectorize(text=vectorize_text))
 
                 # Convert to embedding msg and enqueue
                 embedding_msg = EmbeddingMsgConverter.from_context(memory_context)

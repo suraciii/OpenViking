@@ -21,9 +21,12 @@ PERMANENT_API_ERROR_PATTERNS = (
     "400",
     "401",
     "403",
+    "413",
     "forbidden",
     "unauthorized",
     "accountoverdue",
+    "too large to process",
+    "input must have less than",
 )
 
 QUOTA_EXCEEDED_PATTERNS = (
