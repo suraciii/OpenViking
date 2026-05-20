@@ -103,7 +103,7 @@ function getRankingBreakdown(item, profile) {
   const abstract = (item.abstract || item.overview || "").trim();
   const cat = (item.category || "").toLowerCase();
   const uri = item.uri.toLowerCase();
-  const leafBoost = (item.level === 2 || uri.endsWith(".md")) ? 0.12 : 0;
+  const leafBoost = (item.level === 2 || uri.endsWith(".md")) ? 0.03 : 0;
   const eventBoost = profile.wantsTemporal && (cat === "events" || uri.includes("/events/")) ? 0.1 : 0;
   const prefBoost = profile.wantsPreference && (cat === "preferences" || uri.includes("/preferences/")) ? 0.08 : 0;
   const overlapBoost = lexicalOverlapBoost(profile.tokens, `${item.uri} ${abstract}`);
@@ -136,16 +136,7 @@ function pickMemories(items, limit, queryText) {
   const profile = buildQueryProfile(queryText);
   const sorted = [...items].sort((a, b) => rankForInjection(b, profile) - rankForInjection(a, profile));
   const deduped = dedupeByAbstract(sorted);
-  const leaves = deduped.filter((m) => m.level === 2 || m.uri.endsWith(".md"));
-  if (leaves.length >= limit) return leaves.slice(0, limit);
-  const picked = [...leaves];
-  const used = new Set(picked.map((m) => m.uri));
-  for (const item of deduped) {
-    if (picked.length >= limit) break;
-    if (used.has(item.uri)) continue;
-    picked.push(item);
-  }
-  return picked;
+  return deduped.slice(0, limit);
 }
 
 function postProcess(items, limit, threshold) {
@@ -153,7 +144,6 @@ function postProcess(items, limit, threshold) {
   const sorted = [...items].sort((a, b) => clampScore(b.score) - clampScore(a.score));
   const result = [];
   for (const item of sorted) {
-    if (item.level !== 2) continue;
     if (clampScore(item.score) < threshold) continue;
     const cat = (item.category || "").toLowerCase() || "unknown";
     const abs = (item.abstract || item.overview || "").trim().toLowerCase();
@@ -255,6 +245,64 @@ async function readMemoryContent(uri) {
   return null;
 }
 
+function estimateTokens(text) {
+  return text ? Math.ceil(text.length / 4) : 0;
+}
+
+function truncateContent(content, maxChars) {
+  const trimmed = String(content || "").trim();
+  if (!trimmed || trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars).trimEnd()}...`;
+}
+
+async function resolveMemoryContent(item) {
+  const summary = (item.abstract || item.overview || "").trim();
+  if (cfg.recallPreferAbstract && summary) return summary;
+  if (item.level === 2) {
+    const content = await readMemoryContent(item.uri);
+    if (content) return content;
+  }
+  return summary || item.uri;
+}
+
+async function buildMemoryContext(items) {
+  let budgetRemaining = cfg.recallTokenBudget;
+  let contentCount = 0;
+  let hintCount = 0;
+  const lines = [
+    "<openviking-context>",
+    "Relevant long-term memories from OpenViking. Use the read MCP tool to expand URIs when needed.",
+  ];
+
+  for (const item of items) {
+    const label = item.category || "memory";
+    const score = `${Math.round(clampScore(item.score) * 100)}%`;
+    const uriLine = `- [${label} ${score}] ${item.uri}`;
+    const content = truncateContent(await resolveMemoryContent(item), cfg.recallMaxContentChars);
+    const contentLine = `- [${label} ${score}] ${content}`;
+    const lineTokens = estimateTokens(contentLine);
+
+    if (lineTokens > budgetRemaining && contentCount > 0) {
+      lines.push(uriLine);
+      hintCount += 1;
+      continue;
+    }
+
+    lines.push(contentLine);
+    budgetRemaining -= lineTokens;
+    contentCount += 1;
+  }
+
+  lines.push("</openviking-context>");
+  log("injection_built", {
+    contentItems: contentCount,
+    hintItems: hintCount,
+    budgetUsed: cfg.recallTokenBudget - budgetRemaining,
+    budgetTotal: cfg.recallTokenBudget,
+  });
+  return lines.join("\n");
+}
+
 async function main() {
   if (!cfg.autoRecall) {
     log("skip", { stage: "init", reason: "autoRecall disabled" });
@@ -277,7 +325,13 @@ async function main() {
   log("start", {
     query: userPrompt.slice(0, 200),
     queryLength: userPrompt.length,
-    config: { recallLimit: cfg.recallLimit, scoreThreshold: cfg.scoreThreshold },
+    config: {
+      recallLimit: cfg.recallLimit,
+      scoreThreshold: cfg.scoreThreshold,
+      recallPreferAbstract: cfg.recallPreferAbstract,
+      recallMaxContentChars: cfg.recallMaxContentChars,
+      recallTokenBudget: cfg.recallTokenBudget,
+    },
   });
 
   if (!userPrompt || userPrompt.length < cfg.minQueryLength) {
@@ -329,23 +383,7 @@ async function main() {
 
   log("picked", { pickedCount: memories.length, uris: memories.map((m) => m.uri) });
 
-  const lines = await Promise.all(
-    memories.map(async (item) => {
-      if (item.level === 2) {
-        const content = await readMemoryContent(item.uri);
-        if (content) return `- [${item.category || "memory"}] ${content}`;
-      }
-      return `- [${item.category || "memory"}] ${(item.abstract || item.overview || item.uri).trim()}`;
-    }),
-  );
-
-  const memoryContext =
-    "<relevant-memories>\n" +
-    "The following long-term memories from OpenViking may be relevant to this conversation:\n" +
-    lines.join("\n") + "\n" +
-    "</relevant-memories>";
-
-  emit(memoryContext);
+  emit(await buildMemoryContext(memories));
 }
 
 main().catch((err) => { logError("uncaught", err); emit(); });
