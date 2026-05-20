@@ -217,15 +217,6 @@ export function loadConfig() {
       num(cx.minQueryLength, 3),
     ))),
     logRankingDetails: envBool("OPENVIKING_LOG_RANKING_DETAILS") ?? (cx.logRankingDetails === true),
-    recallPreferAbstract: envBool("OPENVIKING_RECALL_PREFER_ABSTRACT") ?? (cx.recallPreferAbstract !== false),
-    recallMaxContentChars: Math.max(50, Math.floor(num(
-      process.env.OPENVIKING_RECALL_MAX_CONTENT_CHARS,
-      num(cx.recallMaxContentChars, 500),
-    ))),
-    recallTokenBudget: Math.max(200, Math.floor(num(
-      process.env.OPENVIKING_RECALL_TOKEN_BUDGET,
-      num(cx.recallTokenBudget, 2000),
-    ))),
 
     autoCapture: envBool("OPENVIKING_AUTO_CAPTURE") ?? (cx.autoCapture !== false),
     captureMode: (str(process.env.OPENVIKING_CAPTURE_MODE, str(cx.captureMode, "semantic")) === "keyword")
