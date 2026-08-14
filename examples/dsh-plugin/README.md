@@ -24,8 +24,10 @@ dsh adapter is new.
 - **Commit for memory extraction** — flushes captured turns at every `turn/end`
   and commits (server-side memory extraction) every `commitTurnThreshold`
   turns, when server-reported pending tokens cross `commitTokenThreshold`, and
-  at agent disposal (bounded to 3s). Commit honors `commitKeepRecentCount` to
-  keep the newest raw messages un-archived.
+  at agent disposal (bounded to 3s). Routine commits honor
+  `commitKeepRecentCount` (newest raw messages stay live, matching the other
+  harness plugins); the disposal commit forces `0` so a short session's memory
+  is extracted immediately at the session boundary.
 - **Session-start injection** — on `agent/session-start`, the agent profile
   (`profileInject`) and any archived overview of a resumed session
   (`resumeContextBudget`) are injected through dsh's own `agent.inject()`
@@ -101,7 +103,7 @@ other memory plugins.
 | `autoCapture` | `true` | Capture turns into OpenViking (`OPENVIKING_AUTO_CAPTURE`) |
 | `commitTurnThreshold` | `8` | Commit (memory extraction) every N turns (`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
 | `commitTokenThreshold` | `20000` | Commit when server-reported pending tokens cross this; `0` disables (`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
-| `commitKeepRecentCount` | `0` | Keep the newest N raw messages un-archived on commit (`keep_recent_count`). Messages inside the window are retained in the session and extracted once they leave the window on a later commit (deferred, never lost); `0` archives and extracts immediately (`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
+| `commitKeepRecentCount` | `10` | Keep the newest N raw messages un-archived on routine commits (`keep_recent_count`; matches codex/claude/openclaw/pi/opencode defaults). Messages inside the window are retained in the session and extracted once they leave the window on a later commit (deferred, never lost). Session disposal commits force `0` so everything is archived and extracted immediately (`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
 | `resumeContextBudget` | `0` | Token budget for one-shot archive-overview injection on resumed sessions; `0` disables (`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
 | `recallLimit` | `10` | Max recall entries (`OPENVIKING_RECALL_LIMIT`) |
 | `recallTokenBudget` | `2000` | Recall token budget (`OPENVIKING_RECALL_TOKEN_BUDGET`) |

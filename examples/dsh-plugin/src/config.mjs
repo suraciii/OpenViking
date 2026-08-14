@@ -95,7 +95,7 @@ export function resolveDshConfig(pluginConfig = {}) {
     ),
     commitKeepRecentCount: num(
       env.OPENVIKING_COMMIT_KEEP_RECENT_COUNT,
-      pluginConfig.commitKeepRecentCount ?? 0,
+      pluginConfig.commitKeepRecentCount ?? 10,
       0,
     ),
     resumeContextBudget: num(

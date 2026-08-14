@@ -112,16 +112,22 @@ export function createSessionTracker(ctx, cfg) {
 
   async function commit(state, opts = {}) {
     await sendPending(state);
+    // Boundary commits (session disposal) pass keepRecentCount 0 so everything
+    // is archived and extracted; routine commits keep the configured window so
+    // the newest raw messages stay live, matching the other harness plugins.
+    const keepRecentCount = Number.isFinite(opts.keepRecentCount)
+      ? Math.max(0, opts.keepRecentCount)
+      : cfg.commitKeepRecentCount;
     const result = await state.client.fetchJSON(
       `/api/v1/sessions/${encodeURIComponent(state.ovSessionId)}/commit`,
       {
         method: "POST",
-        body: JSON.stringify({ keep_recent_count: cfg.commitKeepRecentCount }),
+        body: JSON.stringify({ keep_recent_count: keepRecentCount }),
       },
       opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {},
     );
     if (!result.ok && isRetryableFailure(result)) {
-      await enqueue("commitSession", state.ovSessionId, { keep_recent_count: cfg.commitKeepRecentCount });
+      await enqueue("commitSession", state.ovSessionId, { keep_recent_count: keepRecentCount });
     }
     if (result.ok) {
       state.turnsSinceCommit = 0;
@@ -236,7 +242,7 @@ export function createSessionTracker(ctx, cfg) {
       if (isSubagent(session, cfg)) return;
       const state = stateFor(session);
       const timeoutMs = Math.min(DISPOSE_COMMIT_TIMEOUT_MS, Number(cfg.timeoutMs) || DISPOSE_COMMIT_TIMEOUT_MS);
-      enqueueWrite(state, () => commit(state, { timeoutMs }));
+      enqueueWrite(state, () => commit(state, { timeoutMs, keepRecentCount: 0 }));
       state.writes.finally(() => {
         if (states.get(String(session.id)) === state) states.delete(String(session.id));
       });

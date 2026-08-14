@@ -109,7 +109,7 @@ test("flushAndCommit flushes pending and commits", async () => {
 
 test("disposed agent flushes and commits detached", async () => {
   stubFetch();
-  const cfg = { enabled: true, autoCapture: true, commitTurnThreshold: 8 };
+  const cfg = { enabled: true, autoCapture: true, commitTurnThreshold: 8, commitKeepRecentCount: 10 };
   const tracker = createSessionTracker({}, cfg);
   const session = fakeSession();
 
@@ -119,6 +119,26 @@ test("disposed agent flushes and commits detached", async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
   const commit = calls.find((call) => call.url.includes("/commit"));
   assert.ok(commit, "expected a commit call on disposal");
+  const body = JSON.parse(commit.body);
+  assert.equal(body.keep_recent_count, 0, "disposal commits archive everything");
+});
+
+test("routine commit uses the configured keep window", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, commitTurnThreshold: 2, commitKeepRecentCount: 10 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, userEvent("hello"));
+  tracker.onSessionEvent(session, turnEndEvent(1));
+  tracker.onSessionEvent(session, userEvent("again"));
+  tracker.onSessionEvent(session, turnEndEvent(2));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const commit = calls.find((call) => call.url.includes("/commit"));
+  assert.ok(commit, "expected a commit call at the turn threshold");
+  const body = JSON.parse(commit.body);
+  assert.equal(body.keep_recent_count, 10, "routine commits keep the configured window");
 });
 
 test("skips subagent sessions unless captureSubagents is set", async () => {
