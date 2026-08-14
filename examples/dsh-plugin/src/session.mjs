@@ -11,6 +11,7 @@ import { extractTextFromContent } from "./shared/capture-utils.mjs";
 import { createLogger } from "./shared/debug-log.mjs";
 import { enqueue } from "./shared/pending-queue.mjs";
 import { isRetryableFailure } from "./shared/retryable.mjs";
+import { isBypassed } from "./shared/session-model.mjs";
 
 const CAPTURE_BUFFER_LIMIT = 200;
 const PREFIX = "dsh";
@@ -160,6 +161,7 @@ export function createSessionTracker(ctx, cfg) {
     /** Handle one `session/event` firehose event. */
     onSessionEvent(session, event) {
       if (!cfg.enabled || !cfg.autoCapture) return;
+      if (isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd })) return;
       // Subagent sessions (header.parentSession set) are task-scoped workers;
       // capturing them would flood memory with delegated-tool noise. Recall
       // still runs for them; only capture is skipped unless opted in.
@@ -250,6 +252,7 @@ export function createSessionTracker(ctx, cfg) {
       const session = agent.session;
       if (!session) return;
       if (!cfg.enabled || !cfg.autoCapture) return;
+      if (isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd })) return;
       if (isSubagent(session, cfg)) return;
       const state = stateFor(session);
       const timeoutMs = Math.min(DISPOSE_COMMIT_TIMEOUT_MS, Number(cfg.timeoutMs) || DISPOSE_COMMIT_TIMEOUT_MS);

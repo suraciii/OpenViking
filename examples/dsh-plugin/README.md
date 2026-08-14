@@ -23,8 +23,9 @@ dsh adapter is new.
   is replayed once on plugin start.
 - **Commit for memory extraction** — flushes captured turns at every `turn/end`
   and commits (server-side memory extraction) when server-reported pending
-  tokens cross `commitTokenThreshold`, optionally every `commitTurnThreshold`
-  turns, and at agent disposal (bounded to 3s). Routine commits honor
+  tokens cross `commitTokenThreshold`, every `commitTurnThreshold` turns
+  (official shared-library default 8), and at agent disposal (bounded to 3s).
+  Routine commits honor
   `commitKeepRecentCount` (newest raw messages stay live, matching the other
   harness plugins); the disposal commit forces `0` so a short session's memory
   is extracted immediately at the session boundary.
@@ -101,7 +102,7 @@ other memory plugins.
 | `enabled` | `true` | Master switch (`OPENVIKING_MEMORY_ENABLED`) |
 | `autoRecall` | `true` | Inject recall before each user turn (`OPENVIKING_AUTO_RECALL`) |
 | `autoCapture` | `true` | Capture turns into OpenViking (`OPENVIKING_AUTO_CAPTURE`) |
-| `commitTurnThreshold` | `0` | Opt-in: commit (memory extraction) every N turns; `0` disables and relies on the token threshold plus the disposal commit (`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
+| `commitTurnThreshold` | `8` | Commit (memory extraction) every N turns (official shared-library default; `0` disables) (`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
 | `commitTokenThreshold` | `20000` | Commit when server-reported pending tokens cross this; `0` disables (`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
 | `commitKeepRecentCount` | `10` | Keep the newest N raw messages un-archived on routine commits (`keep_recent_count`; matches codex/claude/openclaw/pi/opencode defaults). Messages inside the window are retained in the session and extracted once they leave the window on a later commit (deferred, never lost). Session disposal commits force `0` so everything is archived and extracted immediately (`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
 | `resumeContextBudget` | `32000` | Token budget for one-shot archive-overview injection on resumed sessions; `0` disables (`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
@@ -112,8 +113,10 @@ other memory plugins.
 | `recallQueryExpansion` | `auto` | `off` disables the server-side query-expansion model call (`OPENVIKING_RECALL_QUERY_EXPANSION`) |
 | `minQueryLength` | `3` | Skip recall for shorter human prompts (`OPENVIKING_RECALL_MIN_QUERY_LENGTH`) |
 | `profileInject` | `true` | Inject the one-shot user profile block at session start (matches claude/pi/opencode) (`OPENVIKING_PROFILE_INJECT`) |
-| `profileTokenBudget` | `10000` | Token budget for the injected profile (`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
+| `profileTokenBudget` | `6000` | Token budget for the injected profile (official shared-library default) (`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
 | `captureSubagents` | `false` | Also capture subagent sessions; off by default to avoid delegated-task noise (`OPENVIKING_CAPTURE_SUBAGENTS`) |
+| `bypassSession` | `false` | Skip capture, recall, and injection for every session (`OPENVIKING_BYPASS_SESSION`) |
+| `bypassSessionPatterns` | `[]` | Comma-separated globs matched against session id and cwd; matching sessions are skipped (`OPENVIKING_BYPASS_SESSION_PATTERNS`) |
 | `captureAssistantTurns` | `true` | Capture assistant replies (`OPENVIKING_CAPTURE_ASSISTANT_TURNS`) |
 | `captureMaxLength` | `24000` | Truncate captured message content beyond this length (`OPENVIKING_CAPTURE_MAX_LENGTH`) |
 | `captureTools` | `false` | Include tool call/result text in captured turns (`OPENVIKING_CAPTURE_TOOLS`) |

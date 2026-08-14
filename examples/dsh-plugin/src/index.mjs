@@ -22,6 +22,7 @@ import { buildProfileBlock } from "./shared/profile-inject.mjs";
 import { replayAgentPending } from "./shared/agent-hook-runtime.mjs";
 import { sessionContext } from "./client.mjs";
 import { createLogger } from "./shared/debug-log.mjs";
+import { isBypassed } from "./shared/session-model.mjs";
 
 export const name = "openviking";
 export const inject = ["tools", "systemPrompt"];
@@ -48,6 +49,7 @@ export function apply(ctx, config) {
   ctx.on("agent/session-start", async ({ agent }) => {
     const session = agent.session;
     if (!session) return;
+    if (isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd })) return;
     const state = tracker.stateFor(session);
     try {
       const parts = [];

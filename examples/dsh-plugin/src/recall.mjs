@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import { recallForPrompt } from "./shared/agent-hook-runtime.mjs";
 import { extractTextFromContent } from "./shared/capture-utils.mjs";
 import { createLogger } from "./shared/debug-log.mjs";
+import { isBypassed } from "./shared/session-model.mjs";
 
 function deepFreeze(value) {
   if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -50,13 +51,14 @@ export function installRecall(ctx, cfg, tracker) {
     const decision = await next();
     if (decision.kind !== "enter") return decision;
     if (!cfg.enabled || !cfg.autoRecall) return decision;
+    const session = agent.session;
+    if (!session) return decision;
+    if (isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd })) return decision;
     const human = decision.messages.find((message) => message?.source?.kind === "user");
     if (!human) return decision;
     const text = extractTextFromContent(human.content);
     if (!text?.trim()) return decision;
     if (text.trim().length < cfg.minQueryLength) return decision;
-    const session = agent.session;
-    if (!session) return decision;
     const state = tracker.stateFor(session);
     try {
       const block = await recallForPrompt(

@@ -285,6 +285,33 @@ test("token threshold 0 disables threshold commits", async () => {
   assert.ok(!calls.some((call) => call.url.includes("/commit")), "no commit without thresholds");
 });
 
+test("bypassSessionPatterns skip capture and disposal commit", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, commitTurnThreshold: 8, bypassSessionPatterns: ["scratch-*", "/tmp/scratch*"] };
+  const tracker = createSessionTracker({}, cfg);
+  const session = { id: "scratch-42", header: { cwd: "/tmp/scratch-proj" } };
+
+  tracker.onSessionEvent(session, userEvent("do not remember this"));
+  tracker.onSessionEvent(session, turnEndEvent(1));
+  tracker.onAgentDisposed({ session });
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(calls.length, 0, "bypassed sessions are neither captured nor committed");
+});
+
+test("bypassSession true skips everything", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, commitTurnThreshold: 8, bypassSession: true };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, userEvent("nothing"));
+  tracker.onSessionEvent(session, turnEndEvent(1));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(calls.length, 0);
+});
+
 test("captures tool results via tool/call and tool/result events", async () => {
   stubFetch();
   const cfg = { enabled: true, autoCapture: true, captureTools: true, commitTurnThreshold: 8 };

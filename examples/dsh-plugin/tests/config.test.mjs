@@ -19,7 +19,10 @@ test("resolveDshConfig defaults", () => {
   assert.equal(cfg.enabled, true);
   assert.equal(cfg.autoRecall, true);
   assert.equal(cfg.autoCapture, true);
-  assert.equal(cfg.commitTurnThreshold, 0);
+  assert.equal(cfg.commitTurnThreshold, 8);
+  assert.equal(cfg.profileTokenBudget, 6000);
+  assert.equal(cfg.bypassSession, false);
+  assert.deepEqual(cfg.bypassSessionPatterns, []);
   assert.equal(cfg.timeoutMs, 15000);
   assert.equal(cfg.recallLimit, 6);
   assert.equal(cfg.recallPeerScope, "all");

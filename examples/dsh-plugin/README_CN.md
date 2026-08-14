@@ -7,7 +7,7 @@
 - **自动召回(auto-recall)** — 在每个包含真实人类消息的 step 开始前,检索相关 OpenViking 上下文并以合成 notice 消息注入,让模型在当前回合看到记忆。召回块会进入会话日志(loop 会记录 pre-step 的每条消息),满足 dsh 的"模型可见 ⟺ 已记录"不变量。
 - **会话捕获(session capture)** — 每个 dsh 会话映射到一个 OpenViking 会话(`dsh-<sessionId>`),增量捕获人类用户回合、助手回复,以及(开启 `captureTools` 时)工具调用与结果;捕获消息带 `created_at`(事件时间)与 `peer_id`;插件来源的注入(召回、goal 轮次、skill 内容)不会被捕获。
 - **串行化写入** — 每个会话的捕获、冲刷、提交全部经过逐会话 promise 链,操作永不乱序;可重试失败进入共享的持久化 pending 队列,插件启动时重放一次。
-- **提交触发记忆提取(commit)** — 每个 `turn/end` 冲刷捕获消息,服务器 pending token 超过 `commitTokenThreshold` 时、可选地每 `commitTurnThreshold` 个回合、以及 agent 销毁时(限时 3 秒)提交(触发服务端记忆提取);常规提交尊重 `commitKeepRecentCount`(保留最新原始消息,与其它 harness 插件一致),销毁提交强制 `0`,短会话在会话边界立即全量提取。
+- **提交触发记忆提取(commit)** — 每个 `turn/end` 冲刷捕获消息,服务器 pending token 超过 `commitTokenThreshold` 时、每 `commitTurnThreshold` 个回合(官方共享库默认 8)、以及 agent 销毁时(限时 3 秒)提交(触发服务端记忆提取);常规提交尊重 `commitKeepRecentCount`(保留最新原始消息,与其它 harness 插件一致),销毁提交强制 `0`,短会话在会话边界立即全量提取。
 - **会话开始注入** — `agent/session-start` 时,通过 dsh 自身的 `agent.inject()` 在首回合前注入代理 profile(`profileInject`)与恢复会话的归档概览(`resumeContextBudget`)。
 - **原生工具** — 在 `ctx.tools` 注册 `openviking_search`、`openviking_find`、`openviking_read`、`openviking_list`、`openviking_browse`、`openviking_remember`、`openviking_forget`、`openviking_add_resource`、`openviking_archive_expand`、`openviking_commit`、`openviking_health`。
 - **viking:// URI 守卫** — 拒绝本地文件系统直接读取 `viking://` URI,并引导模型使用 OpenViking 工具。
@@ -63,7 +63,7 @@ node examples/dsh-plugin/scripts/install.mjs --profile tui --mcp  # + MCP 完整
 | `enabled` | `true` | 总开关(`OPENVIKING_MEMORY_ENABLED`) |
 | `autoRecall` | `true` | 每个用户回合前注入召回(`OPENVIKING_AUTO_RECALL`) |
 | `autoCapture` | `true` | 捕获回合到 OpenViking(`OPENVIKING_AUTO_CAPTURE`) |
-| `commitTurnThreshold` | `0` | 可选:每 N 个回合提交(触发记忆提取);`0` 关闭,依赖 token 阈值与销毁提交(`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
+| `commitTurnThreshold` | `8` | 每 N 个回合提交(触发记忆提取)(官方共享库默认;`0` 关闭)(`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
 | `commitTokenThreshold` | `20000` | 服务器报告的 pending token 超过此值即提交;`0` 关闭(`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
 | `commitKeepRecentCount` | `10` | 常规提交时保留最新 N 条原始消息不归档(`keep_recent_count`;与 codex/claude/openclaw/pi/opencode 默认一致)。窗口内消息保留在会话中,离开窗口后延迟提取(不丢失);会话销毁提交强制 `0`,立即全量归档提取(`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
 | `resumeContextBudget` | `32000` | 恢复会话时一次性注入 archive 概览的 token 预算;`0` 关闭(`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
@@ -74,8 +74,10 @@ node examples/dsh-plugin/scripts/install.mjs --profile tui --mcp  # + MCP 完整
 | `recallQueryExpansion` | `auto` | `off` 关闭服务端查询扩展的模型调用(`OPENVIKING_RECALL_QUERY_EXPANSION`) |
 | `minQueryLength` | `3` | 更短的人类消息跳过召回(`OPENVIKING_RECALL_MIN_QUERY_LENGTH`) |
 | `profileInject` | `true` | 会话开始时注入一次性用户档案块(与 claude/pi/opencode 一致)(`OPENVIKING_PROFILE_INJECT`) |
-| `profileTokenBudget` | `10000` | 注入档案的 token 预算(`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
+| `profileTokenBudget` | `6000` | 注入档案的 token 预算(官方共享库默认)(`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
 | `captureSubagents` | `false` | 同时捕获子代理会话;默认关闭以避免委派任务噪音(`OPENVIKING_CAPTURE_SUBAGENTS`) |
+| `bypassSession` | `false` | 对所有会话跳过捕获、召回与注入(`OPENVIKING_BYPASS_SESSION`) |
+| `bypassSessionPatterns` | `[]` | 逗号分隔的 glob,匹配会话 id 与 cwd;匹配的会话被跳过(`OPENVIKING_BYPASS_SESSION_PATTERNS`) |
 | `captureAssistantTurns` | `true` | 捕获助手回复(`OPENVIKING_CAPTURE_ASSISTANT_TURNS`) |
 | `captureMaxLength` | `24000` | 捕获消息内容超过此长度即截断(`OPENVIKING_CAPTURE_MAX_LENGTH`) |
 | `captureTools` | `false` | 捕获回合中包含工具调用/结果文本(`OPENVIKING_CAPTURE_TOOLS`) |

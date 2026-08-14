@@ -70,13 +70,20 @@ export function resolveDshConfig(pluginConfig = {}) {
     profileInject: bool(env.OPENVIKING_PROFILE_INJECT, pluginConfig.profileInject ?? true),
     profileTokenBudget: num(
       env.OPENVIKING_PROFILE_TOKEN_BUDGET,
-      pluginConfig.profileTokenBudget ?? 10000,
+      pluginConfig.profileTokenBudget ?? 6000,
       200,
     ),
     captureSubagents: bool(
       env.OPENVIKING_CAPTURE_SUBAGENTS,
       pluginConfig.captureSubagents ?? false,
     ),
+    bypassSession: bool(env.OPENVIKING_BYPASS_SESSION, pluginConfig.bypassSession ?? false),
+    bypassSessionPatterns: String(
+      env.OPENVIKING_BYPASS_SESSION_PATTERNS || pluginConfig.bypassSessionPatterns || "",
+    )
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
     captureTools: bool(env.OPENVIKING_CAPTURE_TOOLS, pluginConfig.captureTools ?? false),
     captureAssistantTurns: bool(
       env.OPENVIKING_CAPTURE_ASSISTANT_TURNS,
@@ -95,7 +102,7 @@ export function resolveDshConfig(pluginConfig = {}) {
     timeoutMs: num(env.OPENVIKING_TIMEOUT_MS, pluginConfig.timeoutMs ?? 15000, 1000),
     commitTurnThreshold: num(
       env.OPENVIKING_COMMIT_TURN_THRESHOLD,
-      pluginConfig.commitTurnThreshold ?? 0,
+      pluginConfig.commitTurnThreshold ?? 8,
       0,
     ),
     commitTokenThreshold: num(
