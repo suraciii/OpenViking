@@ -14,6 +14,14 @@ export function createClient(cfg, cwd) {
   return makeAgentFetchJSON(cfg, cwd || process.cwd());
 }
 
+/** GET /api/v1/sessions/{id}/context?token_budget= — archive overview for a resumed session, when one exists. */
+export async function sessionContext(client, sessionId, tokenBudget) {
+  const result = await client.fetchJSON(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/context?token_budget=${Number(tokenBudget) || 128000}`,
+  );
+  return result.ok ? result.result : null;
+}
+
 /**
  * Race a shared-runtime request against an external abort signal so tool
  * executions honor `exec.signal`. The underlying request still settles under

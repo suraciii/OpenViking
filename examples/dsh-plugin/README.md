@@ -21,8 +21,9 @@ dsh adapter is new.
   and at agent disposal. Retryable failures go through the shared durable
   pending queue.
 - **Native tools** — `openviking_search`, `openviking_find`, `openviking_read`,
-  `openviking_list`, `openviking_remember`, `openviking_commit`, and
-  `openviking_health` registered on `ctx.tools`.
+  `openviking_list`, `openviking_browse`, `openviking_remember`,
+  `openviking_forget`, `openviking_add_resource`, `openviking_archive_expand`,
+  `openviking_commit`, and `openviking_health` registered on `ctx.tools`.
 - **viking:// URI guard** — denies local filesystem reads of `viking://` URIs
   and points the model back to the OpenViking tools.
 - **System-prompt section** — teaches the model about the OpenViking context
@@ -44,8 +45,16 @@ below.
 
 ## Install
 
-Mount the plugin from this checkout or install it as an npm package. Add to
-your dsh `cordis.yml` (full example: [`cordis.yml.example`](./cordis.yml.example)):
+Mount the plugin from this checkout or install it as an npm package. The
+included installer writes the profile patch for you (idempotent):
+
+```bash
+node examples/dsh-plugin/scripts/install.mjs --profile tui        # native plugin
+node examples/dsh-plugin/scripts/install.mjs --profile tui --mcp  # + MCP tool closure
+```
+
+Or add to your dsh `cordis.yml` manually (full example:
+[`cordis.yml.example`](./cordis.yml.example)):
 
 ```yaml
 - id: openviking
@@ -81,6 +90,8 @@ other memory plugins.
 | `autoRecall` | `true` | Inject recall before each user turn (`OPENVIKING_AUTO_RECALL`) |
 | `autoCapture` | `true` | Capture turns into OpenViking (`OPENVIKING_AUTO_CAPTURE`) |
 | `commitTurnThreshold` | `8` | Commit (memory extraction) every N turns (`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
+| `commitTokenThreshold` | `20000` | Commit when server-reported pending tokens cross this; `0` disables (`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
+| `resumeContextBudget` | `0` | Token budget for one-shot archive-overview injection on resumed sessions; `0` disables (`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
 | `recallLimit` | `10` | Max recall entries (`OPENVIKING_RECALL_LIMIT`) |
 | `recallTokenBudget` | `2000` | Recall token budget (`OPENVIKING_RECALL_TOKEN_BUDGET`) |
 | `scoreThreshold` | `0.35` | Minimum similarity score (`OPENVIKING_SCORE_THRESHOLD`) |

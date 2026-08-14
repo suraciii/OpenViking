@@ -9,6 +9,7 @@ import { recallForPrompt } from "./shared/agent-hook-runtime.mjs";
 import { buildProfileBlock } from "./shared/profile-inject.mjs";
 import { extractTextFromContent } from "./shared/capture-utils.mjs";
 import { createLogger } from "./shared/debug-log.mjs";
+import { sessionContext } from "./client.mjs";
 
 /**
  * Install the pre-step recall waterfall.
@@ -21,6 +22,8 @@ export function installRecall(ctx, cfg, tracker) {
   const logger = createLogger("dsh:recall", cfg);
   /** Sessions that already received their one-shot profile block. */
   const profiledSessions = new Set();
+  /** Sessions that already received their one-shot archive overview. */
+  const rehydratedSessions = new Set();
 
   async function profileBlockFor(state) {
     if (!cfg.profileInject || profiledSessions.has(state.sessionId)) return "";
@@ -43,6 +46,27 @@ export function installRecall(ctx, cfg, tracker) {
     }
   }
 
+  /** One-shot archive overview for resumed sessions (resumeContextBudget > 0). */
+  async function archiveBlockFor(state) {
+    if (!cfg.resumeContextBudget || rehydratedSessions.has(state.sessionId)) return "";
+    rehydratedSessions.add(state.sessionId);
+    try {
+      const ctx = await sessionContext(state.client.fetchJSON, state.ovSessionId, cfg.resumeContextBudget);
+      const overview = ctx?.latest_archive_overview;
+      if (!overview) return "";
+      return [
+        '<openviking-context source="session-archive">',
+        "<session-archive>",
+        overview,
+        "</session-archive>",
+        "</openviking-context>",
+      ].join("\n");
+    } catch (error) {
+      logger.log("archive_error", { message: String(error?.message || error) });
+      return "";
+    }
+  }
+
   ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
     const decision = await next();
     if (decision.kind !== "enter") return decision;
@@ -56,7 +80,7 @@ export function installRecall(ctx, cfg, tracker) {
     if (!session) return decision;
     const state = tracker.stateFor(session);
     try {
-      const [block, profile] = await Promise.all([
+      const [block, profile, archive] = await Promise.all([
         recallForPrompt(
           state.client.fetchJSON,
           cfg,
@@ -69,8 +93,9 @@ export function installRecall(ctx, cfg, tracker) {
           { sessionId: state.ovSessionId, actorPeerId: state.client.effectivePeer.peerId },
         ),
         profileBlockFor(state),
+        archiveBlockFor(state),
       ]);
-      const parts = [profile, block].filter(Boolean);
+      const parts = [archive, profile, block].filter(Boolean);
       if (parts.length === 0) return decision;
       const recallMessage = {
         id: randomUUID(),

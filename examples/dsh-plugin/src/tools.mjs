@@ -277,6 +277,164 @@ export function installTools(ctx, cfg, tracker) {
   });
 
   register({
+    name: "openviking_browse",
+    description:
+      "Browse the OpenViking store like a filesystem: list a viking:// directory or stat one entry (action=list|stat, uri defaults to viking://).",
+    parameters: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["list", "stat"], description: "list a directory or stat one entry." },
+        uri: stringSchema("viking:// URI (default: viking://)."),
+      },
+      required: ["action"],
+    },
+    output: { schema: { type: "string" }, render },
+    async execute(args, exec) {
+      const state = clientFor(exec);
+      const uri = String(args.uri || "viking://");
+      if (args.action === "stat") {
+        const info = await callWithSignal(
+          state.client.fetchJSON,
+          `/api/v1/fs/stat?uri=${encodeURIComponent(uri)}`,
+          {},
+          exec.signal,
+        );
+        if (!info.ok) return `OpenViking stat failed: not found or unreadable (${uri}).`;
+        return bound(textOf(info.result));
+      }
+      const result = await callWithSignal(
+        state.client.fetchJSON,
+        `/api/v1/fs/ls?uri=${encodeURIComponent(uri)}&output=original`,
+        {},
+        exec.signal,
+      );
+      if (!result.ok) return `OpenViking browse failed (${result.status || "network"}): ${textOf(result.error)}`;
+      const entries = Array.isArray(result.result?.entries)
+        ? result.result.entries
+        : Array.isArray(result.result)
+          ? result.result
+          : [];
+      if (entries.length === 0) return `(empty) ${uri}`;
+      return bound(entries.map((entry) => {
+        const name = entry.name ?? entry.uri ?? "";
+        return entry.isDir ? `📁 ${name}` : `📄 ${name}`;
+      }).join("\n"));
+    },
+  });
+
+  register({
+    name: "openviking_forget",
+    description:
+      "Delete a memory by viking:// URI, or remove the strongest search match (score above min_score, default 0.8). Use to correct outdated or wrong information.",
+    parameters: {
+      type: "object",
+      properties: {
+        uri: stringSchema("Exact viking:// URI of the memory to delete."),
+        query: stringSchema("Search query; deletes the strongest match when its score exceeds min_score."),
+        min_score: numberSchema("Minimum score for query deletion (default 0.8)."),
+      },
+      required: [],
+    },
+    output: { schema: { type: "string" }, render },
+    async execute(args, exec) {
+      const state = clientFor(exec);
+      if (args.uri) {
+        const ok = await callWithSignal(
+          state.client.fetchJSON,
+          `/api/v1/fs?uri=${encodeURIComponent(String(args.uri))}&recursive=false`,
+          { method: "DELETE" },
+          exec.signal,
+        );
+        return ok.ok
+          ? `Deleted: ${args.uri}`
+          : `OpenViking forget failed (${ok.status || "network"}): ${textOf(ok.error)}`;
+      }
+      if (args.query) {
+        const minScore = Number(args.min_score ?? 0.8);
+        const found = await callWithSignal(
+          state.client.fetchJSON,
+          "/api/v1/search/find",
+          { method: "POST", body: JSON.stringify({ query: String(args.query), limit: 1 }) },
+          exec.signal,
+        );
+        const hit = Array.isArray(found.result?.entries) ? found.result.entries[0]
+          : Array.isArray(found.result) ? found.result[0] : null;
+        if (hit && Number(hit.score ?? 0) >= minScore) {
+          const ok = await callWithSignal(
+            state.client.fetchJSON,
+            `/api/v1/fs?uri=${encodeURIComponent(String(hit.uri))}&recursive=false`,
+            { method: "DELETE" },
+            exec.signal,
+          );
+          return ok.ok ? `Deleted: ${hit.uri} (score ${Number(hit.score).toFixed(2)})` : `Failed to delete: ${hit.uri}`;
+        }
+        return `No strong match found (score >= ${minScore} required).`;
+      }
+      return "OpenViking forget: provide either 'uri' or 'query'.";
+    },
+  });
+
+  register({
+    name: "openviking_add_resource",
+    description:
+      "Ingest a remote URL into OpenViking; the page is processed into tiered content and indexed for semantic search. HTTP(S) URLs only — the server rejects direct host filesystem paths.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: stringSchema("The HTTP(S) URL to ingest."),
+        to: stringSchema("Optional target viking:// directory."),
+      },
+      required: ["path"],
+    },
+    output: { schema: { type: "string" }, render },
+    async execute(args, exec) {
+      const state = clientFor(exec);
+      const body = { path: String(args.path) };
+      if (args.to) body.to = String(args.to);
+      const result = await callWithSignal(
+        state.client.fetchJSON,
+        "/api/v1/resources",
+        { method: "POST", body: JSON.stringify(body) },
+        exec.signal,
+      );
+      if (!result.ok) {
+        return `OpenViking add_resource failed (${result.status || "network"}): ${textOf(result.error)}`;
+      }
+      const rootUri = isRecord(result.result) ? result.result.root_uri : "";
+      return rootUri ? `Ingested: ${rootUri}` : `Ingested: ${args.path}`;
+    },
+  });
+
+  register({
+    name: "openviking_archive_expand",
+    description:
+      "Expand an archived OpenViking session into its overview (raw messages summarized by the server). Use when an archive summary is too coarse and you need detailed history.",
+    parameters: {
+      type: "object",
+      properties: {
+        session_id: stringSchema("The OpenViking session id (e.g. dsh-<dsh session id>)."),
+      },
+      required: ["session_id"],
+    },
+    output: { schema: { type: "string" }, render },
+    async execute(args, exec) {
+      const state = clientFor(exec);
+      const sid = String(args.session_id);
+      const base = `viking://session/${encodeURIComponent(sid)}`;
+      for (const uri of [base, `${base}/history`]) {
+        const result = await callWithSignal(
+          state.client.fetchJSON,
+          `/api/v1/content/overview?uri=${encodeURIComponent(uri)}`,
+          {},
+          exec.signal,
+        );
+        if (result.ok) return bound(textOf(result.result));
+      }
+      return `OpenViking archive not found: ${sid}`;
+    },
+  });
+
+  register({
     name: "openviking_health",
     description: "Check whether the OpenViking server is reachable and healthy.",
     parameters: { type: "object", properties: {} },

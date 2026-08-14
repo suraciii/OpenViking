@@ -59,16 +59,19 @@ export function createSessionTracker(ctx, cfg) {
   }
 
   async function flush(state) {
-    if (!cfg.autoCapture || state.pending.length === 0) return;
+    if (!cfg.autoCapture || state.pending.length === 0) return null;
     const payloads = state.pending;
     state.pending = [];
     const result = await addAgentMessages(state.client.fetchJSON, state.ovSessionId, payloads);
     const sent = Number(result?.sent ?? 0);
     if (sent === 0) {
       logger.log("flush_failed", { sessionId: state.sessionId, queued: payloads.length, result });
-    } else {
-      logger.log("flush", { sessionId: state.sessionId, sent });
+      return null;
     }
+    // Server-reported pending tokens drive the token-threshold commit.
+    const pendingTokens = Number(result?.result?.pending_tokens ?? 0);
+    logger.log("flush", { sessionId: state.sessionId, sent, pendingTokens });
+    return { sent, pendingTokens };
   }
 
   async function commit(state) {
@@ -78,6 +81,18 @@ export function createSessionTracker(ctx, cfg) {
       state.turnsSinceCommit = 0;
     }
     logger.log("commit", { sessionId: state.sessionId, ok: result?.ok, status: result?.status });
+  }
+
+  /** Commit when the server-reported pending tokens cross the threshold. */
+  async function maybeCommitByToken(state) {
+    await flush(state);
+    const sessionInfo = await state.client.fetchJSON(
+      `/api/v1/sessions/${encodeURIComponent(state.ovSessionId)}`,
+    );
+    const pendingTokens = Number(sessionInfo?.result?.pending_tokens ?? 0);
+    if (pendingTokens >= cfg.commitTokenThreshold) {
+      await commit(state);
+    }
   }
 
   return {
@@ -115,6 +130,8 @@ export function createSessionTracker(ctx, cfg) {
           state.turnsSinceCommit += 1;
           if (state.turnsSinceCommit >= cfg.commitTurnThreshold) {
             void commit(state).catch(() => {});
+          } else if (cfg.commitTokenThreshold > 0) {
+            void maybeCommitByToken(state).catch(() => {});
           } else {
             void flush(state).catch(() => {});
           }

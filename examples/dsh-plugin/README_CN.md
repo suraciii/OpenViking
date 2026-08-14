@@ -7,7 +7,7 @@
 - **自动召回(auto-recall)** — 在每个包含真实人类消息的 step 开始前,检索相关 OpenViking 上下文并以合成 notice 消息注入,让模型在当前回合看到记忆。召回块会进入会话日志(loop 会记录 pre-step 的每条消息),满足 dsh 的"模型可见 ⟺ 已记录"不变量。
 - **会话捕获(session capture)** — 每个 dsh 会话映射到一个 OpenViking 会话(`dsh-<sessionId>`),增量捕获人类用户回合与助手回复;插件来源的注入(召回、goal 轮次、skill 内容)不会被捕获。
 - **提交触发记忆提取(commit)** — 每个 `turn/end` 冲刷捕获消息,每 `commitTurnThreshold` 个回合及 agent 销毁时提交(触发服务端记忆提取);可重试失败进入共享的持久化 pending 队列。
-- **原生工具** — 在 `ctx.tools` 注册 `openviking_search`、`openviking_find`、`openviking_read`、`openviking_list`、`openviking_remember`、`openviking_commit`、`openviking_health`。
+- **原生工具** — 在 `ctx.tools` 注册 `openviking_search`、`openviking_find`、`openviking_read`、`openviking_list`、`openviking_browse`、`openviking_remember`、`openviking_forget`、`openviking_add_resource`、`openviking_archive_expand`、`openviking_commit`、`openviking_health`。
 - **viking:// URI 守卫** — 拒绝本地文件系统直接读取 `viking://` URI,并引导模型使用 OpenViking 工具。
 - **系统提示词区块** — 告知模型会话可用的 OpenViking 上下文数据库。
 - **/viking 命令** — 人类命令,查看状态与强制提交(仅在组合了命令注册表时注册)。
@@ -21,7 +21,14 @@
 
 ## 安装
 
-从本仓库挂载,或作为 npm 包安装。在你的 dsh `cordis.yml` 中加入(完整示例见 [`cordis.yml.example`](./cordis.yml.example)):
+从本仓库挂载,或作为 npm 包安装。附带幂等安装器,自动写入 profile 的 patch 文件:
+
+```bash
+node examples/dsh-plugin/scripts/install.mjs --profile tui        # 原生插件
+node examples/dsh-plugin/scripts/install.mjs --profile tui --mcp  # + MCP 完整工具面
+```
+
+或手动在你的 dsh `cordis.yml` 中加入(完整示例见 [`cordis.yml.example`](./cordis.yml.example)):
 
 ```yaml
 - id: openviking
@@ -55,6 +62,8 @@
 | `autoRecall` | `true` | 每个用户回合前注入召回(`OPENVIKING_AUTO_RECALL`) |
 | `autoCapture` | `true` | 捕获回合到 OpenViking(`OPENVIKING_AUTO_CAPTURE`) |
 | `commitTurnThreshold` | `8` | 每 N 个回合提交(触发记忆提取)(`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
+| `commitTokenThreshold` | `20000` | 服务器报告的 pending token 超过此值即提交;`0` 关闭(`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
+| `resumeContextBudget` | `0` | 恢复会话时一次性注入 archive 概览的 token 预算;`0` 关闭(`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
 | `recallLimit` | `10` | 召回条数上限(`OPENVIKING_RECALL_LIMIT`) |
 | `recallTokenBudget` | `2000` | 召回 token 预算(`OPENVIKING_RECALL_TOKEN_BUDGET`) |
 | `scoreThreshold` | `0.35` | 最低相似度(`OPENVIKING_SCORE_THRESHOLD`) |

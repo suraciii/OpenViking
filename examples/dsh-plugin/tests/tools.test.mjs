@@ -64,8 +64,12 @@ test("registers the expected tool set with schemas and render", () => {
   const { registered } = makeHarness({});
   const names = registered.map((definition) => definition.name).sort();
   assert.deepEqual(names, [
+    "openviking_add_resource",
+    "openviking_archive_expand",
+    "openviking_browse",
     "openviking_commit",
     "openviking_find",
+    "openviking_forget",
     "openviking_health",
     "openviking_list",
     "openviking_read",

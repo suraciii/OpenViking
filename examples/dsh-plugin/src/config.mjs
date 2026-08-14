@@ -88,6 +88,16 @@ export function resolveDshConfig(pluginConfig = {}) {
       pluginConfig.commitTurnThreshold ?? 8,
       1,
     ),
+    commitTokenThreshold: num(
+      env.OPENVIKING_COMMIT_TOKEN_THRESHOLD,
+      pluginConfig.commitTokenThreshold ?? 20000,
+      0,
+    ),
+    resumeContextBudget: num(
+      env.OPENVIKING_RESUME_CONTEXT_BUDGET,
+      pluginConfig.resumeContextBudget ?? 0,
+      0,
+    ),
     captureTools: bool(env.OPENVIKING_CAPTURE_TOOLS, pluginConfig.captureTools ?? false),
     debug: bool(env.OPENVIKING_DEBUG, pluginConfig.debug ?? false),
     debugLogPath:
