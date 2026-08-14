@@ -53,6 +53,11 @@ test("resolveDshConfig honors OPENVIKING_* env knobs when plugin config is silen
   assert.equal(cfg.recallPeerScope, "actor");
 });
 
+test("resolveDshConfig accepts endpoint as an alias for baseUrl", () => {
+  const cfg = resolveDshConfig({ endpoint: "http://alias:1933" });
+  assert.equal(cfg.baseUrl, "http://alias:1933");
+});
+
 test("resolveDshConfig derives baseUrl from ovcli-style credentials when unset", () => {
   process.env.OPENVIKING_CLI_CONFIG_FILE = "/nonexistent/ovcli.conf";
   const cfg = resolveDshConfig({});

@@ -24,9 +24,15 @@ function num(value, fallback, minimum = 0) {
 export function resolveDshConfig(pluginConfig = {}) {
   const env = process.env;
   const credentials = resolveOpenVikingCredentials(env);
+  // `endpoint` is the field name used by the pi extension; accept it as an
+  // alias for `baseUrl` so the two plugins share one configuration vocabulary.
+  const baseUrl = pluginConfig.baseUrl
+    || pluginConfig.endpoint
+    || credentials.baseUrl;
   const cfg = {
     ...credentials,
     ...pluginConfig,
+    baseUrl,
     userAgent: buildUserAgent("dsh", env.OPENVIKING_INTEGRATION_VERSION),
     enabled: bool(env.OPENVIKING_MEMORY_ENABLED, pluginConfig.enabled ?? true),
     autoRecall: bool(env.OPENVIKING_AUTO_RECALL, pluginConfig.autoRecall ?? true),
