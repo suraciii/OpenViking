@@ -28,6 +28,7 @@ const TARGETS = [
   { dir: join(ROOT, "examples", "opencode-plugin", "lib", "shared"), files: OPENCODE_SHARED_FILES },
   { dir: join(ROOT, "examples", "pi-coding-agent-extension", "shared"), files: HARNESS_SHARED_FILES },
   { dir: join(ROOT, "examples", "zcode-memory-plugin", "scripts", "shared") },
+  { dir: join(ROOT, "examples", "dsh-plugin", "src", "shared") },
 ];
 
 const GENERATED_HEADER = "// GENERATED FROM examples/memory-plugin-shared/lib. DO NOT EDIT.\n";

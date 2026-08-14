@@ -1,0 +1,36 @@
+# OpenViking memory plugin for a DeepSeek Harness (dsh) deployment.
+#
+# Mount this file's entries into your dsh cordis.yml (or merge them).
+# Two pieces compose the full integration:
+#   1. the native memory-loop plugin (recall injection, session capture/commit,
+#      viking:// URI guard, system-prompt section, /viking command);
+#   2. the dsh MCP client pointing at OpenViking's built-in /mcp endpoint,
+#      which gives the model the full OpenViking tool closure
+#      (find/search/recall/read/list/remember/add_resource/grep/glob/code_*).
+#
+# Adjust <REPO_ROOT> to the OpenViking checkout path, or install the plugin
+# as an npm package and reference it by name instead.
+- id: openviking
+  name: '<REPO_ROOT>/examples/dsh-plugin/src/index.mjs'
+  config:
+    # Endpoint + identity. All optional: when omitted, the plugin falls back to
+    # OPENVIKING_URL/OPENVIKING_API_KEY env vars, then ~/.openviking/ovcli.conf.
+    baseUrl: !!js 'process.env.OPENVIKING_URL || "http://localhost:1933"'
+    apiKey: !!js process.env.OPENVIKING_API_KEY
+    # account: ''
+    # user: ''
+    # peerId: ''            # explicit actor peer; default derives from session cwd
+    autoRecall: true        # inject relevant memory before each user turn
+    autoCapture: true       # capture user/assistant turns into OpenViking
+    commitTurnThreshold: 8  # commit (memory extraction) every N turns
+    timeoutMs: 15000
+    # debug: true           # structured logs to ~/.openviking/logs/dsh-plugin.log
+
+- id: openviking-mcp
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: openviking
+    transport: streamable-http
+    url: !!js '`${process.env.OPENVIKING_URL || "http://localhost:1933"}/mcp`'
+    headers:
+      Authorization: !!js '`Bearer ${process.env.OPENVIKING_API_KEY || ""}`'

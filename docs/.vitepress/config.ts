@@ -139,7 +139,8 @@ const agentIntegrationSidebar = {
           ['03-openclaw.md', 'OpenClaw'],
           ['05-hermes.md', 'Hermes'],
           ['07-langchain-langgraph.md', 'LangChain / LangGraph'],
-          ['11-pi.md', 'pi']
+          ['11-pi.md', 'pi'],
+          ['15-dsh.md', 'DeepSeek Harness (dsh)']
         ]
       },
       {
@@ -172,7 +173,8 @@ const agentIntegrationSidebar = {
           ['03-openclaw.md', 'OpenClaw'],
           ['05-hermes.md', 'Hermes'],
           ['07-langchain-langgraph.md', 'LangChain / LangGraph'],
-          ['11-pi.md', 'pi']
+          ['11-pi.md', 'pi'],
+          ['15-dsh.md', 'DeepSeek Harness (dsh)']
         ]
       },
       {
