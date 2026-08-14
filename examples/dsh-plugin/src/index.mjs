@@ -110,6 +110,11 @@ export function apply(ctx, config) {
   ctx.on("agent/disposed", ({ agent }) => {
     tracker.onAgentDisposed(agent);
   });
+  // Authoritative per-session cleanup: fires with the session object still
+  // attached, unlike agent/disposed where agent.session is already detached.
+  ctx.on("session/disposed", (session) => {
+    tracker.onSessionDisposed(session);
+  });
 
   installTools(ctx, cfg, tracker);
   installRecall(ctx, cfg, tracker);

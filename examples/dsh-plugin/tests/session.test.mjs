@@ -312,6 +312,21 @@ test("bypassSession true skips everything", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("session/disposed releases per-session state (recall-created included)", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: false, commitTurnThreshold: 8 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+  // Recall creates state even when capture is off; a subagent dispose would
+  // have agent.session detached, so session/disposed is the cleanup edge.
+  const first = tracker.stateFor(session);
+  tracker.onSessionEvent(session, userEvent("no capture"));
+  tracker.onSessionDisposed(session);
+  const second = tracker.stateFor(session);
+  assert.notEqual(first, second, "state released by session/disposed");
+  assert.equal(second.pending.length, 0, "fresh state has no captured messages");
+});
+
 test("captures tool results via tool/call and tool/result events", async () => {
   stubFetch();
   const cfg = { enabled: true, autoCapture: true, captureTools: true, commitTurnThreshold: 8 };

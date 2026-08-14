@@ -247,14 +247,25 @@ export function createSessionTracker(ctx, cfg) {
       return state.ovSessionId;
     },
 
+    /** Release per-session state when the dsh session store detaches it.
+     *
+     * This is the authoritative cleanup edge: at agent disposal the session
+     * may already be detached (`agent.session` undefined on `agent/disposed`,
+     * as observed in real runs), while `session/disposed` still carries the
+     * session object. Recall may have created state even when capture is
+     * disabled, bypassed, or subagent, so every detached session is released
+     * unconditionally. The in-flight commit keeps its captured closure, so
+     * deleting the map entry cannot race it.
+     */
+    onSessionDisposed(session) {
+      states.delete(String(session.id));
+    },
+
     /** Detached best-effort flush+commit at agent disposal (bounded timeout). */
     onAgentDisposed(agent) {
       const session = agent.session;
       if (!session) return;
       const id = String(session.id);
-      // Recall may have created state even when capture is disabled, bypassed,
-      // or subagent — always release it so long-lived parents do not leak
-      // one entry per delegated worker.
       if (!cfg.enabled || !cfg.autoCapture || isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd }) || isSubagent(session, cfg)) {
         states.delete(id);
         return;
