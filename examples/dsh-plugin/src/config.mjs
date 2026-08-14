@@ -38,7 +38,7 @@ export function resolveDshConfig(pluginConfig = {}) {
     autoRecall: bool(env.OPENVIKING_AUTO_RECALL, pluginConfig.autoRecall ?? true),
     autoCapture: bool(env.OPENVIKING_AUTO_CAPTURE, pluginConfig.autoCapture ?? true),
     workspacePeer: bool(env.OPENVIKING_WORKSPACE_PEER, pluginConfig.workspacePeer ?? true),
-    recallLimit: num(env.OPENVIKING_RECALL_LIMIT, pluginConfig.recallLimit ?? 10, 1),
+    recallLimit: num(env.OPENVIKING_RECALL_LIMIT, pluginConfig.recallLimit ?? 6, 1),
     recallTokenBudget: num(
       env.OPENVIKING_RECALL_TOKEN_BUDGET,
       pluginConfig.recallTokenBudget ?? 2000,
@@ -67,15 +67,25 @@ export function resolveDshConfig(pluginConfig = {}) {
       || pluginConfig.recallQueryExpansion,
     ),
     minQueryLength: num(env.OPENVIKING_RECALL_MIN_QUERY_LENGTH, pluginConfig.minQueryLength ?? 3, 0),
-    profileInject: bool(env.OPENVIKING_PROFILE_INJECT, pluginConfig.profileInject ?? false),
+    profileInject: bool(env.OPENVIKING_PROFILE_INJECT, pluginConfig.profileInject ?? true),
     profileTokenBudget: num(
       env.OPENVIKING_PROFILE_TOKEN_BUDGET,
-      pluginConfig.profileTokenBudget ?? 4000,
+      pluginConfig.profileTokenBudget ?? 10000,
       200,
     ),
     captureSubagents: bool(
       env.OPENVIKING_CAPTURE_SUBAGENTS,
       pluginConfig.captureSubagents ?? false,
+    ),
+    captureTools: bool(env.OPENVIKING_CAPTURE_TOOLS, pluginConfig.captureTools ?? false),
+    captureAssistantTurns: bool(
+      env.OPENVIKING_CAPTURE_ASSISTANT_TURNS,
+      pluginConfig.captureAssistantTurns ?? true,
+    ),
+    captureMaxLength: num(
+      env.OPENVIKING_CAPTURE_MAX_LENGTH,
+      pluginConfig.captureMaxLength ?? 24000,
+      100,
     ),
     captureToolMaxChars: num(
       env.OPENVIKING_CAPTURE_TOOL_MAX_CHARS,
@@ -100,10 +110,9 @@ export function resolveDshConfig(pluginConfig = {}) {
     ),
     resumeContextBudget: num(
       env.OPENVIKING_RESUME_CONTEXT_BUDGET,
-      pluginConfig.resumeContextBudget ?? 0,
+      pluginConfig.resumeContextBudget ?? 32000,
       0,
     ),
-    captureTools: bool(env.OPENVIKING_CAPTURE_TOOLS, pluginConfig.captureTools ?? false),
     debug: bool(env.OPENVIKING_DEBUG, pluginConfig.debug ?? false),
     debugLogPath:
       env.OPENVIKING_DEBUG_LOG

@@ -21,7 +21,7 @@ test("resolveDshConfig defaults", () => {
   assert.equal(cfg.autoCapture, true);
   assert.equal(cfg.commitTurnThreshold, 8);
   assert.equal(cfg.timeoutMs, 15000);
-  assert.equal(cfg.recallLimit, 10);
+  assert.equal(cfg.recallLimit, 6);
   assert.equal(cfg.recallPeerScope, "all");
   assert.equal(cfg.captureTools, false);
   assert.equal(cfg.userAgent, "openviking-memory-dsh/0.0.0");

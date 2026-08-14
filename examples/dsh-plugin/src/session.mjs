@@ -26,13 +26,19 @@ function ovSessionIdFor(sessionId) {
 
 function textOf(message, cfg) {
   if (!message || !Array.isArray(message.content)) return "";
+  let text = "";
   if (cfg.captureTools) {
-    return extractTextFromContent(message.content, { toolMaxChars: cfg.captureToolMaxChars });
+    text = extractTextFromContent(message.content, { toolMaxChars: cfg.captureToolMaxChars });
+  } else {
+    // Without captureTools, keep only plain text blocks: tool calls and their
+    // results would otherwise leak noisy internals into long-term memory.
+    const textBlocks = message.content.filter((block) => block?.type === "text");
+    text = extractTextFromContent(textBlocks, { toolMaxChars: cfg.captureToolMaxChars });
   }
-  // Without captureTools, keep only plain text blocks: tool calls and their
-  // results would otherwise leak noisy internals into long-term memory.
-  const textBlocks = message.content.filter((block) => block?.type === "text");
-  return extractTextFromContent(textBlocks, { toolMaxChars: cfg.captureToolMaxChars });
+  if (text.length > cfg.captureMaxLength) {
+    return text.slice(0, cfg.captureMaxLength);
+  }
+  return text;
 }
 
 function createdAtOf(event) {
@@ -199,6 +205,7 @@ export function createSessionTracker(ctx, cfg) {
           return;
         }
         case "assistant/message": {
+          if (cfg.captureAssistantTurns === false) return;
           const text = textOf(event.data.message, cfg);
           if (!text.trim()) return;
           const payload = { role: "assistant", content: text };

@@ -66,16 +66,18 @@ node examples/dsh-plugin/scripts/install.mjs --profile tui --mcp  # + MCP 完整
 | `commitTurnThreshold` | `8` | 每 N 个回合提交(触发记忆提取)(`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
 | `commitTokenThreshold` | `20000` | 服务器报告的 pending token 超过此值即提交;`0` 关闭(`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
 | `commitKeepRecentCount` | `10` | 常规提交时保留最新 N 条原始消息不归档(`keep_recent_count`;与 codex/claude/openclaw/pi/opencode 默认一致)。窗口内消息保留在会话中,离开窗口后延迟提取(不丢失);会话销毁提交强制 `0`,立即全量归档提取(`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
-| `resumeContextBudget` | `0` | 恢复会话时一次性注入 archive 概览的 token 预算;`0` 关闭(`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
-| `recallLimit` | `10` | 召回条数上限(`OPENVIKING_RECALL_LIMIT`) |
+| `resumeContextBudget` | `32000` | 恢复会话时一次性注入 archive 概览的 token 预算;`0` 关闭(`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
+| `recallLimit` | `6` | 召回条数上限(与 codex/claude/pi 一致)(`OPENVIKING_RECALL_LIMIT`) |
 | `recallTokenBudget` | `2000` | 召回 token 预算(`OPENVIKING_RECALL_TOKEN_BUDGET`) |
 | `scoreThreshold` | `0.35` | 最低相似度(`OPENVIKING_SCORE_THRESHOLD`) |
 | `recallPeerScope` | `all` | `actor` 表示工作区隔离召回(`OPENVIKING_RECALL_PEER_SCOPE`) |
 | `recallQueryExpansion` | `auto` | `off` 关闭服务端查询扩展的模型调用(`OPENVIKING_RECALL_QUERY_EXPANSION`) |
 | `minQueryLength` | `3` | 更短的人类消息跳过召回(`OPENVIKING_RECALL_MIN_QUERY_LENGTH`) |
-| `profileInject` | `false` | 会话开始时注入一次性用户档案块(`OPENVIKING_PROFILE_INJECT`) |
-| `profileTokenBudget` | `4000` | 注入档案的 token 预算(`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
+| `profileInject` | `true` | 会话开始时注入一次性用户档案块(与 claude/pi/opencode 一致)(`OPENVIKING_PROFILE_INJECT`) |
+| `profileTokenBudget` | `10000` | 注入档案的 token 预算(`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
 | `captureSubagents` | `false` | 同时捕获子代理会话;默认关闭以避免委派任务噪音(`OPENVIKING_CAPTURE_SUBAGENTS`) |
+| `captureAssistantTurns` | `true` | 捕获助手回复(`OPENVIKING_CAPTURE_ASSISTANT_TURNS`) |
+| `captureMaxLength` | `24000` | 捕获消息内容超过此长度即截断(`OPENVIKING_CAPTURE_MAX_LENGTH`) |
 | `captureTools` | `false` | 捕获回合中包含工具调用/结果文本(`OPENVIKING_CAPTURE_TOOLS`) |
 | `captureToolMaxChars` | `2000` | `captureTools` 开启时单个工具的截断长度(`OPENVIKING_CAPTURE_TOOL_MAX_CHARS`) |
 | `timeoutMs` | `15000` | 单请求超时(`OPENVIKING_TIMEOUT_MS`) |

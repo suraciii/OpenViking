@@ -215,6 +215,41 @@ test("captureTools true includes tool call text", async () => {
   assert.ok(captured.includes("bash"), "tool block present when captureTools is on");
 });
 
+test("captureAssistantTurns false skips assistant replies", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, captureAssistantTurns: false, commitTurnThreshold: 8 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, userEvent("hello"));
+  tracker.onSessionEvent(session, {
+    type: "assistant/message",
+    data: { message: { content: [{ type: "text", text: "assistant reply" }] } },
+  });
+  tracker.onSessionEvent(session, turnEndEvent(1));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const batch = calls.find((call) => call.url.includes("/messages/batch"));
+  const payload = JSON.parse(batch.body);
+  assert.equal(payload.messages.length, 1, "assistant reply not captured");
+  assert.equal(payload.messages[0].role, "user");
+});
+
+test("captureMaxLength truncates over-long captured messages", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, captureMaxLength: 50, commitTurnThreshold: 8 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, userEvent("x".repeat(200)));
+  tracker.onSessionEvent(session, turnEndEvent(1));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const batch = calls.find((call) => call.url.includes("/messages/batch"));
+  const payload = JSON.parse(batch.body);
+  assert.equal(payload.messages[0].content.length, 50, "content truncated to captureMaxLength");
+});
+
 test("captures tool results via tool/call and tool/result events", async () => {
   stubFetch();
   const cfg = { enabled: true, autoCapture: true, captureTools: true, commitTurnThreshold: 8 };
