@@ -57,15 +57,20 @@ export function createSessionTracker(ctx, cfg) {
     const payloads = state.pending;
     state.pending = [];
     const result = await addAgentMessages(state.client.fetchJSON, state.ovSessionId, payloads);
-    if (!result || (result.sent ?? 0) === 0) {
-      logger.log("flush", { sessionId: state.sessionId, result });
+    const sent = Number(result?.sent ?? 0);
+    if (sent === 0) {
+      logger.log("flush_failed", { sessionId: state.sessionId, queued: payloads.length, result });
+    } else {
+      logger.log("flush", { sessionId: state.sessionId, sent });
     }
   }
 
   async function commit(state) {
     await flush(state);
     const result = await commitAgentSession(state.client.fetchJSON, state.ovSessionId);
-    state.turnsSinceCommit = 0;
+    if (result?.ok) {
+      state.turnsSinceCommit = 0;
+    }
     logger.log("commit", { sessionId: state.sessionId, ok: result?.ok, status: result?.status });
   }
 

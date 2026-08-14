@@ -67,11 +67,13 @@ export function installTools(ctx, cfg, tracker) {
     },
     output: { schema: { type: "string" }, render },
     async execute(args, exec) {
+      const query = String(args.query || "").trim();
+      if (!query) return "OpenViking search failed: provide a non-empty query.";
       const state = clientFor(exec);
       const block = await buildServerAssembledBlock(
         state.client.fetchJSON,
         cfg,
-        String(args.query),
+        query,
         {
           sessionId: state.ovSessionId,
           actorPeerId: state.client.effectivePeer.peerId,
