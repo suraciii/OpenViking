@@ -75,7 +75,7 @@ node examples/dsh-plugin/scripts/install.mjs --profile tui --mcp  # + MCP 完整
 | `minQueryLength` | `3` | 更短的人类消息跳过召回(`OPENVIKING_RECALL_MIN_QUERY_LENGTH`) |
 | `profileInject` | `true` | 会话开始时注入一次性用户档案块(与 claude/pi/opencode 一致)(`OPENVIKING_PROFILE_INJECT`) |
 | `profileTokenBudget` | `6000` | 注入档案的 token 预算(官方共享库默认)(`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
-| `captureSubagents` | `false` | 同时捕获子代理会话;默认关闭以避免委派任务噪音(`OPENVIKING_CAPTURE_SUBAGENTS`) |
+| `captureSubagents` | `false` | 同时把子代理会话捕获到各自的 OpenViking 会话。默认关闭:dsh 每个委派任务都会产生子代理,且父会话捕获的消息已包含其产出摘要。子代理始终获得召回,永不获得档案/归档注入(`OPENVIKING_CAPTURE_SUBAGENTS`) |
 | `bypassSession` | `false` | 对所有会话跳过捕获、召回与注入(`OPENVIKING_BYPASS_SESSION`) |
 | `bypassSessionPatterns` | `[]` | 逗号分隔的 glob,匹配会话 id 与 cwd;匹配的会话被跳过(`OPENVIKING_BYPASS_SESSION_PATTERNS`) |
 | `captureAssistantTurns` | `true` | 捕获助手回复(`OPENVIKING_CAPTURE_ASSISTANT_TURNS`) |

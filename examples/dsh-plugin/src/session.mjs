@@ -52,7 +52,7 @@ function createdAtOf(event) {
   }
 }
 
-function isSubagent(session, cfg) {
+export function isSubagent(session, cfg) {
   return Boolean(session.header?.parentSession) && !cfg.captureSubagents;
 }
 
@@ -251,14 +251,19 @@ export function createSessionTracker(ctx, cfg) {
     onAgentDisposed(agent) {
       const session = agent.session;
       if (!session) return;
-      if (!cfg.enabled || !cfg.autoCapture) return;
-      if (isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd })) return;
-      if (isSubagent(session, cfg)) return;
+      const id = String(session.id);
+      // Recall may have created state even when capture is disabled, bypassed,
+      // or subagent — always release it so long-lived parents do not leak
+      // one entry per delegated worker.
+      if (!cfg.enabled || !cfg.autoCapture || isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd }) || isSubagent(session, cfg)) {
+        states.delete(id);
+        return;
+      }
       const state = stateFor(session);
       const timeoutMs = Math.min(DISPOSE_COMMIT_TIMEOUT_MS, Number(cfg.timeoutMs) || DISPOSE_COMMIT_TIMEOUT_MS);
       enqueueWrite(state, () => commit(state, { timeoutMs, keepRecentCount: 0 }));
       state.writes.finally(() => {
-        if (states.get(String(session.id)) === state) states.delete(String(session.id));
+        if (states.get(id) === state) states.delete(id);
       });
     },
   };

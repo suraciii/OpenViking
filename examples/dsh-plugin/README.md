@@ -114,7 +114,7 @@ other memory plugins.
 | `minQueryLength` | `3` | Skip recall for shorter human prompts (`OPENVIKING_RECALL_MIN_QUERY_LENGTH`) |
 | `profileInject` | `true` | Inject the one-shot user profile block at session start (matches claude/pi/opencode) (`OPENVIKING_PROFILE_INJECT`) |
 | `profileTokenBudget` | `6000` | Token budget for the injected profile (official shared-library default) (`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
-| `captureSubagents` | `false` | Also capture subagent sessions; off by default to avoid delegated-task noise (`OPENVIKING_CAPTURE_SUBAGENTS`) |
+| `captureSubagents` | `false` | Also capture subagent sessions into their own OpenViking sessions. Off by default: dsh spawns subagents per delegated task, and the parent's captured messages already include their summarized output. Subagents always get recall, never profile/archive injection (`OPENVIKING_CAPTURE_SUBAGENTS`) |
 | `bypassSession` | `false` | Skip capture, recall, and injection for every session (`OPENVIKING_BYPASS_SESSION`) |
 | `bypassSessionPatterns` | `[]` | Comma-separated globs matched against session id and cwd; matching sessions are skipped (`OPENVIKING_BYPASS_SESSION_PATTERNS`) |
 | `captureAssistantTurns` | `true` | Capture assistant replies (`OPENVIKING_CAPTURE_ASSISTANT_TURNS`) |

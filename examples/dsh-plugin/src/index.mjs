@@ -12,7 +12,7 @@
 // OpenViking tool closure (MCP tools) plus the memory loop below.
 import { resolveDshConfig } from "./config.mjs";
 import { createClient } from "./client.mjs";
-import { createSessionTracker } from "./session.mjs";
+import { createSessionTracker, isSubagent } from "./session.mjs";
 import { installRecall, createNoticeMessage } from "./recall.mjs";
 import { installTools } from "./tools.mjs";
 import { installUriGuard } from "./uri-guard.mjs";
@@ -49,38 +49,50 @@ export function apply(ctx, config) {
   ctx.on("agent/session-start", async ({ agent }) => {
     const session = agent.session;
     if (!session) return;
+    // Subagents are task-scoped workers: they get recall but no profile or
+    // archive injection (matches the claude plugin, which skips profile
+    // injection for subagents entirely).
     if (isBypassed(cfg, { sessionId: session.id, cwd: session.header?.cwd })) return;
+    if (isSubagent(session, cfg)) return;
     const state = tracker.stateFor(session);
     try {
       const parts = [];
       if (cfg.profileInject) {
-        const profile = await buildProfileBlock(
-          state.client.fetchJSON,
-          cfg.profileTokenBudget,
-          state.client.effectivePeer.peerId,
-        );
-        if (profile?.block) {
-          parts.push([
-            '<openviking-context source="profile">',
-            profile.block,
-            "</openviking-context>",
-          ].join("\n"));
+        try {
+          const profile = await buildProfileBlock(
+            state.client.fetchJSON,
+            cfg.profileTokenBudget,
+            state.client.effectivePeer.peerId,
+          );
+          if (profile?.block) {
+            parts.push([
+              '<openviking-context source="profile">',
+              profile.block,
+              "</openviking-context>",
+            ].join("\n"));
+          }
+        } catch (profileError) {
+          logger.log("profile_error", { sessionId: state.sessionId, message: String(profileError?.message || profileError) });
         }
       }
       if (cfg.resumeContextBudget > 0) {
-        const resumable = await sessionContext(
-          state.client.fetchJSON,
-          state.ovSessionId,
-          cfg.resumeContextBudget,
-        );
-        if (resumable?.latest_archive_overview) {
-          parts.push([
-            '<openviking-context source="session-archive">',
-            "<session-archive>",
-            resumable.latest_archive_overview,
-            "</session-archive>",
-            "</openviking-context>",
-          ].join("\n"));
+        try {
+          const resumable = await sessionContext(
+            state.client,
+            state.ovSessionId,
+            cfg.resumeContextBudget,
+          );
+          if (resumable?.latest_archive_overview) {
+            parts.push([
+              '<openviking-context source="session-archive">',
+              "<session-archive>",
+              resumable.latest_archive_overview,
+              "</session-archive>",
+              "</openviking-context>",
+            ].join("\n"));
+          }
+        } catch (archiveError) {
+          logger.log("archive_error", { sessionId: state.sessionId, message: String(archiveError?.message || archiveError) });
         }
       }
       if (parts.length === 0) return;
