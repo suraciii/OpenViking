@@ -101,7 +101,7 @@ other memory plugins.
 | `autoCapture` | `true` | Capture turns into OpenViking (`OPENVIKING_AUTO_CAPTURE`) |
 | `commitTurnThreshold` | `8` | Commit (memory extraction) every N turns (`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
 | `commitTokenThreshold` | `20000` | Commit when server-reported pending tokens cross this; `0` disables (`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
-| `commitKeepRecentCount` | `0` | Keep the newest N raw messages un-archived on commit (`keep_recent_count`); `0` archives everything (`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
+| `commitKeepRecentCount` | `0` | Keep the newest N raw messages un-archived on commit (`keep_recent_count`). Messages inside the window are retained in the session and extracted once they leave the window on a later commit (deferred, never lost); `0` archives and extracts immediately (`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
 | `resumeContextBudget` | `0` | Token budget for one-shot archive-overview injection on resumed sessions; `0` disables (`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
 | `recallLimit` | `10` | Max recall entries (`OPENVIKING_RECALL_LIMIT`) |
 | `recallTokenBudget` | `2000` | Recall token budget (`OPENVIKING_RECALL_TOKEN_BUDGET`) |
