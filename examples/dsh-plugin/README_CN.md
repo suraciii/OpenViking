@@ -5,8 +5,10 @@
 ## 功能
 
 - **自动召回(auto-recall)** — 在每个包含真实人类消息的 step 开始前,检索相关 OpenViking 上下文并以合成 notice 消息注入,让模型在当前回合看到记忆。召回块会进入会话日志(loop 会记录 pre-step 的每条消息),满足 dsh 的"模型可见 ⟺ 已记录"不变量。
-- **会话捕获(session capture)** — 每个 dsh 会话映射到一个 OpenViking 会话(`dsh-<sessionId>`),增量捕获人类用户回合与助手回复;插件来源的注入(召回、goal 轮次、skill 内容)不会被捕获。
-- **提交触发记忆提取(commit)** — 每个 `turn/end` 冲刷捕获消息,每 `commitTurnThreshold` 个回合及 agent 销毁时提交(触发服务端记忆提取);可重试失败进入共享的持久化 pending 队列。
+- **会话捕获(session capture)** — 每个 dsh 会话映射到一个 OpenViking 会话(`dsh-<sessionId>`),增量捕获人类用户回合、助手回复,以及(开启 `captureTools` 时)工具调用与结果;捕获消息带 `created_at`(事件时间)与 `peer_id`;插件来源的注入(召回、goal 轮次、skill 内容)不会被捕获。
+- **串行化写入** — 每个会话的捕获、冲刷、提交全部经过逐会话 promise 链,操作永不乱序;可重试失败进入共享的持久化 pending 队列,插件启动时重放一次。
+- **提交触发记忆提取(commit)** — 每个 `turn/end` 冲刷捕获消息,每 `commitTurnThreshold` 个回合、服务器 pending token 超过 `commitTokenThreshold` 时、以及 agent 销毁时(限时 3 秒)提交(触发服务端记忆提取);提交尊重 `commitKeepRecentCount`,保留最新原始消息不归档。
+- **会话开始注入** — `agent/session-start` 时,通过 dsh 自身的 `agent.inject()` 在首回合前注入代理 profile(`profileInject`)与恢复会话的归档概览(`resumeContextBudget`)。
 - **原生工具** — 在 `ctx.tools` 注册 `openviking_search`、`openviking_find`、`openviking_read`、`openviking_list`、`openviking_browse`、`openviking_remember`、`openviking_forget`、`openviking_add_resource`、`openviking_archive_expand`、`openviking_commit`、`openviking_health`。
 - **viking:// URI 守卫** — 拒绝本地文件系统直接读取 `viking://` URI,并引导模型使用 OpenViking 工具。
 - **系统提示词区块** — 告知模型会话可用的 OpenViking 上下文数据库。
