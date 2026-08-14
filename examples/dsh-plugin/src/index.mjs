@@ -21,8 +21,8 @@ import { installCommand } from "./command.mjs";
 export const name = "openviking";
 export const inject = ["tools", "systemPrompt"];
 
-export function apply(ctx) {
-  const cfg = resolveDshConfig(ctx.config || {});
+export function apply(ctx, config) {
+  const cfg = resolveDshConfig(config || {});
   if (!cfg.enabled) return;
 
   const tracker = createSessionTracker(ctx, cfg);
