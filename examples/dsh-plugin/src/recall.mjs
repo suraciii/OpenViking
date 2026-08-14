@@ -3,13 +3,36 @@
 // the model sees memory for the current turn. The loop logs every message in
 // the pre-step `enter` decision, so the injected recall is reconstructable
 // from the session log.
+//
+// The message is built the same way dsh's own createUserMessage does (id +
+// role from the pinned peer, frozen before publication) so identity and
+// normalization stay consistent with dsh's message invariants.
 import { randomUUID } from "node:crypto";
 
 import { recallForPrompt } from "./shared/agent-hook-runtime.mjs";
-import { buildProfileBlock } from "./shared/profile-inject.mjs";
 import { extractTextFromContent } from "./shared/capture-utils.mjs";
 import { createLogger } from "./shared/debug-log.mjs";
-import { sessionContext } from "./client.mjs";
+
+function deepFreeze(value) {
+  if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const key of Object.keys(value)) deepFreeze(value[key]);
+  return Object.freeze(value);
+}
+
+/** dsh-equivalent createUserMessage: fresh stable identity, frozen. */
+export function createNoticeMessage(content, form) {
+  return deepFreeze({
+    id: randomUUID(),
+    role: "user",
+    content: [{ type: "text", text: content }],
+    source: {
+      kind: "plugin",
+      plugin: "openviking",
+      form,
+      summary: "openviking recall",
+    },
+  });
+}
 
 /**
  * Install the pre-step recall waterfall.
@@ -20,54 +43,10 @@ import { sessionContext } from "./client.mjs";
  */
 export function installRecall(ctx, cfg, tracker) {
   const logger = createLogger("dsh:recall", cfg);
-  /** Sessions that already received their one-shot profile block. */
-  const profiledSessions = new Set();
-  /** Sessions that already received their one-shot archive overview. */
-  const rehydratedSessions = new Set();
 
-  async function profileBlockFor(state) {
-    if (!cfg.profileInject || profiledSessions.has(state.sessionId)) return "";
-    profiledSessions.add(state.sessionId);
-    try {
-      const profile = await buildProfileBlock(
-        state.client.fetchJSON,
-        cfg.profileTokenBudget,
-        state.client.effectivePeer.peerId,
-      );
-      if (!profile?.block) return "";
-      return [
-        '<openviking-context source="session-start">',
-        profile.block,
-        "</openviking-context>",
-      ].join("\n");
-    } catch (error) {
-      logger.log("profile_error", { message: String(error?.message || error) });
-      return "";
-    }
-  }
-
-  /** One-shot archive overview for resumed sessions (resumeContextBudget > 0). */
-  async function archiveBlockFor(state) {
-    if (!cfg.resumeContextBudget || rehydratedSessions.has(state.sessionId)) return "";
-    rehydratedSessions.add(state.sessionId);
-    try {
-      const ctx = await sessionContext(state.client.fetchJSON, state.ovSessionId, cfg.resumeContextBudget);
-      const overview = ctx?.latest_archive_overview;
-      if (!overview) return "";
-      return [
-        '<openviking-context source="session-archive">',
-        "<session-archive>",
-        overview,
-        "</session-archive>",
-        "</openviking-context>",
-      ].join("\n");
-    } catch (error) {
-      logger.log("archive_error", { message: String(error?.message || error) });
-      return "";
-    }
-  }
-
-  ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
+  // prepend: downstream waterfall listeners run first, so this plugin sees
+  // the final claimed batch and appends after every other contributor.
+  ctx.on("agent/pre-step", async ({ agent }, next) => {
     const decision = await next();
     if (decision.kind !== "enter") return decision;
     if (!cfg.enabled || !cfg.autoRecall) return decision;
@@ -80,39 +59,23 @@ export function installRecall(ctx, cfg, tracker) {
     if (!session) return decision;
     const state = tracker.stateFor(session);
     try {
-      const [block, profile, archive] = await Promise.all([
-        recallForPrompt(
-          state.client.fetchJSON,
-          cfg,
-          text,
-          state.cwd,
-          (stage, data) => {
-            logger.log(stage, data);
-            ctx.logger?.debug?.(`openviking recall ${stage}: ${JSON.stringify(data)}`);
-          },
-          { sessionId: state.ovSessionId, actorPeerId: state.client.effectivePeer.peerId },
-        ),
-        profileBlockFor(state),
-        archiveBlockFor(state),
-      ]);
-      const parts = [archive, profile, block].filter(Boolean);
-      if (parts.length === 0) return decision;
-      const recallMessage = {
-        id: randomUUID(),
-        role: "user",
-        content: [{ type: "text", text: parts.join("\n\n") }],
-        source: {
-          kind: "plugin",
-          plugin: "openviking",
-          form: "notice",
-          summary: "openviking recall",
+      const block = await recallForPrompt(
+        state.client.fetchJSON,
+        cfg,
+        text,
+        state.cwd,
+        (stage, data) => {
+          logger.log(stage, data);
+          ctx.logger?.debug?.(`openviking recall ${stage}: ${JSON.stringify(data)}`);
         },
-      };
-      return { kind: "enter", messages: [...decision.messages, recallMessage] };
+        { sessionId: state.ovSessionId, actorPeerId: state.client.effectivePeer.peerId },
+      );
+      if (!block) return decision;
+      return { kind: "enter", messages: [...decision.messages, createNoticeMessage(block, "recall")] };
     } catch (error) {
       logger.log("recall_error", { message: String(error?.message || error) });
       ctx.logger?.warn?.(`openviking recall failed: ${error?.message || error}`);
       return decision;
     }
-  });
+  }, { prepend: true });
 }

@@ -74,7 +74,7 @@ test("appends a recall notice message to the enter decision", async () => {
   const recall = decision.messages[1];
   assert.equal(recall.source.kind, "plugin");
   assert.equal(recall.source.plugin, "openviking");
-  assert.equal(recall.source.form, "notice");
+  assert.equal(recall.source.form, "recall");
   assert.match(recall.content[0].text, /RECALL BLOCK/);
 });
 

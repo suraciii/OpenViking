@@ -13,13 +13,23 @@ dsh adapter is new.
   session log (the loop records every pre-step message), satisfying dsh's
   model-visible ⟺ logged invariant.
 - **Session capture** — maps each dsh session to an OpenViking session
-  (`dsh-<sessionId>`) and incrementally captures human user turns and assistant
-  replies. Plugin-sourced injections (recalls, goal rounds, skill content) are
-  not captured.
+  (`dsh-<sessionId>`) and incrementally captures human user turns, assistant
+  replies, and (with `captureTools`) tool calls and results. Captured messages
+  carry `created_at` (event time) and `peer_id`. Plugin-sourced injections
+  (recalls, goal rounds, skill content) are not captured.
+- **Serialized writes** — every capture, flush, and commit for one session runs
+  through a per-session promise chain so operations never interleave out of
+  order; retryable failures go through the shared durable pending queue, which
+  is replayed once on plugin start.
 - **Commit for memory extraction** — flushes captured turns at every `turn/end`
-  and commits (server-side memory extraction) every `commitTurnThreshold` turns
-  and at agent disposal. Retryable failures go through the shared durable
-  pending queue.
+  and commits (server-side memory extraction) every `commitTurnThreshold`
+  turns, when server-reported pending tokens cross `commitTokenThreshold`, and
+  at agent disposal (bounded to 3s). Commit honors `commitKeepRecentCount` to
+  keep the newest raw messages un-archived.
+- **Session-start injection** — on `agent/session-start`, the agent profile
+  (`profileInject`) and any archived overview of a resumed session
+  (`resumeContextBudget`) are injected through dsh's own `agent.inject()`
+  before the first turn.
 - **Native tools** — `openviking_search`, `openviking_find`, `openviking_read`,
   `openviking_list`, `openviking_browse`, `openviking_remember`,
   `openviking_forget`, `openviking_add_resource`, `openviking_archive_expand`,
@@ -91,6 +101,7 @@ other memory plugins.
 | `autoCapture` | `true` | Capture turns into OpenViking (`OPENVIKING_AUTO_CAPTURE`) |
 | `commitTurnThreshold` | `8` | Commit (memory extraction) every N turns (`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
 | `commitTokenThreshold` | `20000` | Commit when server-reported pending tokens cross this; `0` disables (`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
+| `commitKeepRecentCount` | `0` | Keep the newest N raw messages un-archived on commit (`keep_recent_count`); `0` archives everything (`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
 | `resumeContextBudget` | `0` | Token budget for one-shot archive-overview injection on resumed sessions; `0` disables (`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
 | `recallLimit` | `10` | Max recall entries (`OPENVIKING_RECALL_LIMIT`) |
 | `recallTokenBudget` | `2000` | Recall token budget (`OPENVIKING_RECALL_TOKEN_BUDGET`) |

@@ -194,3 +194,51 @@ test("captureTools true includes tool call text", async () => {
   assert.ok(captured.includes("running it"), "text block present");
   assert.ok(captured.includes("bash"), "tool block present when captureTools is on");
 });
+
+test("captures tool results via tool/call and tool/result events", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, captureTools: true, commitTurnThreshold: 8 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, {
+    type: "tool/call",
+    data: { callId: "call-1", name: "bash", arguments: { command: "ls" } },
+  });
+  tracker.onSessionEvent(session, {
+    type: "tool/result",
+    data: {
+      message: {
+        callId: "call-1",
+        content: [{ type: "text", text: "file.txt\nnotes.md" }],
+        isError: false,
+      },
+    },
+  });
+  tracker.onSessionEvent(session, turnEndEvent(1));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const batch = calls.find((call) => call.url.includes("/messages/batch"));
+  const payload = JSON.parse(batch.body);
+  assert.equal(payload.messages.length, 1, "tool result captured as one message");
+  assert.ok(payload.messages[0].content.includes("file.txt"), "tool result text present");
+});
+
+test("captured messages carry created_at and peer_id when available", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, peerId: "peer-x", commitTurnThreshold: 8 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, {
+    ...userEvent("hello world"),
+    time: 1786688000123,
+  });
+  tracker.onSessionEvent(session, turnEndEvent(1));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const batch = calls.find((call) => call.url.includes("/messages/batch"));
+  const payload = JSON.parse(batch.body);
+  assert.equal(payload.messages[0].created_at, new Date(1786688000123).toISOString());
+  assert.equal(payload.messages[0].peer_id, "peer-x");
+});

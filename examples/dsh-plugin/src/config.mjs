@@ -93,6 +93,11 @@ export function resolveDshConfig(pluginConfig = {}) {
       pluginConfig.commitTokenThreshold ?? 20000,
       0,
     ),
+    commitKeepRecentCount: num(
+      env.OPENVIKING_COMMIT_KEEP_RECENT_COUNT,
+      pluginConfig.commitKeepRecentCount ?? 0,
+      0,
+    ),
     resumeContextBudget: num(
       env.OPENVIKING_RESUME_CONTEXT_BUDGET,
       pluginConfig.resumeContextBudget ?? 0,

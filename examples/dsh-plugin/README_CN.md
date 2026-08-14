@@ -63,6 +63,7 @@ node examples/dsh-plugin/scripts/install.mjs --profile tui --mcp  # + MCP 完整
 | `autoCapture` | `true` | 捕获回合到 OpenViking(`OPENVIKING_AUTO_CAPTURE`) |
 | `commitTurnThreshold` | `8` | 每 N 个回合提交(触发记忆提取)(`OPENVIKING_COMMIT_TURN_THRESHOLD`) |
 | `commitTokenThreshold` | `20000` | 服务器报告的 pending token 超过此值即提交;`0` 关闭(`OPENVIKING_COMMIT_TOKEN_THRESHOLD`) |
+| `commitKeepRecentCount` | `0` | 提交时保留最新 N 条原始消息不归档(`keep_recent_count`);`0` 全部归档提取(`OPENVIKING_COMMIT_KEEP_RECENT_COUNT`) |
 | `resumeContextBudget` | `0` | 恢复会话时一次性注入 archive 概览的 token 预算;`0` 关闭(`OPENVIKING_RESUME_CONTEXT_BUDGET`) |
 | `recallLimit` | `10` | 召回条数上限(`OPENVIKING_RECALL_LIMIT`) |
 | `recallTokenBudget` | `2000` | 召回 token 预算(`OPENVIKING_RECALL_TOKEN_BUDGET`) |

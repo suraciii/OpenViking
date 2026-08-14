@@ -1,13 +1,20 @@
 // Session lifecycle: map each dsh session to an OpenViking session, capture
-// human user turns and assistant replies incrementally, and commit at turn
-// boundaries and session disposal so the server can extract long-term memory.
+// human user turns, assistant replies, and (optionally) tool executions, and
+// commit at turn boundaries and session disposal so the server can extract
+// long-term memory.
+//
+// All writes for one session run through a serialized promise chain so capture
+// and commit operations never interleave out of order. Retryable failures are
+// enqueued by the shared durable pending queue and replayed on the next boot.
 import { createClient } from "./client.mjs";
-import { addAgentMessages, commitAgentSession } from "./shared/agent-hook-runtime.mjs";
 import { extractTextFromContent } from "./shared/capture-utils.mjs";
 import { createLogger } from "./shared/debug-log.mjs";
+import { enqueue } from "./shared/pending-queue.mjs";
+import { isRetryableFailure } from "./shared/retryable.mjs";
 
 const CAPTURE_BUFFER_LIMIT = 200;
 const PREFIX = "dsh";
+const DISPOSE_COMMIT_TIMEOUT_MS = 3000;
 
 function safePart(value) {
   return String(value || "unknown").replace(/[^A-Za-z0-9._-]/g, "-");
@@ -26,6 +33,20 @@ function textOf(message, cfg) {
   // results would otherwise leak noisy internals into long-term memory.
   const textBlocks = message.content.filter((block) => block?.type === "text");
   return extractTextFromContent(textBlocks, { toolMaxChars: cfg.captureToolMaxChars });
+}
+
+function createdAtOf(event) {
+  const time = Number(event?.time);
+  if (!Number.isFinite(time) || time < 0) return undefined;
+  try {
+    return new Date(time).toISOString();
+  } catch {
+    return undefined;
+  }
+}
+
+function isSubagent(session, cfg) {
+  return Boolean(session.header?.parentSession) && !cfg.captureSubagents;
 }
 
 /**
@@ -52,40 +73,66 @@ export function createSessionTracker(ctx, cfg) {
         client: createClient(cfg, cwd),
         pending: [],
         turnsSinceCommit: 0,
+        // Serialized write chain: every capture/commit op appends here.
+        writes: Promise.resolve(),
+        // callId -> tool name, populated from tool/call events when captureTools.
+        toolNames: new Map(),
       };
       states.set(id, state);
     }
     return state;
   }
 
-  async function flush(state) {
-    if (!cfg.autoCapture || state.pending.length === 0) return null;
-    const payloads = state.pending;
-    state.pending = [];
-    const result = await addAgentMessages(state.client.fetchJSON, state.ovSessionId, payloads);
-    const sent = Number(result?.sent ?? 0);
-    if (sent === 0) {
-      logger.log("flush_failed", { sessionId: state.sessionId, queued: payloads.length, result });
-      return null;
-    }
-    // Server-reported pending tokens drive the token-threshold commit.
-    const pendingTokens = Number(result?.result?.pending_tokens ?? 0);
-    logger.log("flush", { sessionId: state.sessionId, sent, pendingTokens });
-    return { sent, pendingTokens };
+  /** Append one async write operation to the session's serialized chain. */
+  function enqueueWrite(state, operation) {
+    state.writes = state.writes.then(operation).catch((error) => {
+      logger.log("write_error", { sessionId: state.sessionId, error: String(error?.message || error) });
+    });
   }
 
-  async function commit(state) {
-    await flush(state);
-    const result = await commitAgentSession(state.client.fetchJSON, state.ovSessionId);
-    if (result?.ok) {
+  async function sendPending(state) {
+    if (state.pending.length === 0) return { sent: 0, pendingTokens: 0 };
+    const payloads = state.pending;
+    state.pending = [];
+    const result = await state.client.fetchJSON(
+      `/api/v1/sessions/${encodeURIComponent(state.ovSessionId)}/messages/batch`,
+      { method: "POST", body: JSON.stringify({ messages: payloads }) },
+    );
+    if (!result.ok) {
+      if (isRetryableFailure(result)) {
+        await enqueue("addMessage", state.ovSessionId, { messages: payloads });
+      }
+      logger.log("flush_failed", { sessionId: state.sessionId, queued: payloads.length, status: result.status });
+      return { sent: 0, pendingTokens: 0, retryable: true };
+    }
+    const pendingTokens = Number(result.result?.pending_tokens ?? 0);
+    logger.log("flush", { sessionId: state.sessionId, sent: payloads.length, pendingTokens });
+    return { sent: payloads.length, pendingTokens };
+  }
+
+  async function commit(state, opts = {}) {
+    await sendPending(state);
+    const result = await state.client.fetchJSON(
+      `/api/v1/sessions/${encodeURIComponent(state.ovSessionId)}/commit`,
+      {
+        method: "POST",
+        body: JSON.stringify({ keep_recent_count: cfg.commitKeepRecentCount }),
+      },
+      opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {},
+    );
+    if (!result.ok && isRetryableFailure(result)) {
+      await enqueue("commitSession", state.ovSessionId, { keep_recent_count: cfg.commitKeepRecentCount });
+    }
+    if (result.ok) {
       state.turnsSinceCommit = 0;
     }
-    logger.log("commit", { sessionId: state.sessionId, ok: result?.ok, status: result?.status });
+    logger.log("commit", { sessionId: state.sessionId, ok: result.ok, status: result.status });
+    return result;
   }
 
   /** Commit when the server-reported pending tokens cross the threshold. */
   async function maybeCommitByToken(state) {
-    await flush(state);
+    await sendPending(state);
     const sessionInfo = await state.client.fetchJSON(
       `/api/v1/sessions/${encodeURIComponent(state.ovSessionId)}`,
     );
@@ -104,14 +151,42 @@ export function createSessionTracker(ctx, cfg) {
       // Subagent sessions (header.parentSession set) are task-scoped workers;
       // capturing them would flood memory with delegated-tool noise. Recall
       // still runs for them; only capture is skipped unless opted in.
-      if (session.header?.parentSession && !cfg.captureSubagents) return;
+      if (isSubagent(session, cfg)) return;
       const state = stateFor(session);
+
+      if (event.type === "tool/call") {
+        // Remember tool names by callId so tool/result captures can label them.
+        if (cfg.captureTools) {
+          state.toolNames.set(String(event.data?.callId), String(event.data?.name || "tool"));
+        }
+        return;
+      }
+
+      if (event.type === "tool/result") {
+        const callId = String(event.data?.message?.callId ?? event.data?.callId ?? "");
+        if (cfg.captureTools && event.data?.message?.content) {
+          const text = textOf(event.data.message, cfg);
+          if (text.trim()) {
+            state.pending.push({ role: "assistant", content: text });
+            if (state.pending.length > CAPTURE_BUFFER_LIMIT) {
+              state.pending.splice(0, state.pending.length - CAPTURE_BUFFER_LIMIT);
+            }
+          }
+        }
+        if (callId) state.toolNames.delete(callId);
+        return;
+      }
+
       switch (event.type) {
         case "user/message": {
           if (event.data.source?.kind !== "user") return;
           const text = textOf(event.data, cfg);
           if (!text.trim()) return;
-          state.pending.push({ role: "user", content: text });
+          const payload = { role: "user", content: text };
+          const createdAt = createdAtOf(event);
+          if (createdAt) payload.created_at = createdAt;
+          if (cfg.peerId) payload.peer_id = cfg.peerId;
+          state.pending.push(payload);
           if (state.pending.length > CAPTURE_BUFFER_LIMIT) {
             state.pending.splice(0, state.pending.length - CAPTURE_BUFFER_LIMIT);
           }
@@ -120,7 +195,11 @@ export function createSessionTracker(ctx, cfg) {
         case "assistant/message": {
           const text = textOf(event.data.message, cfg);
           if (!text.trim()) return;
-          state.pending.push({ role: "assistant", content: text });
+          const payload = { role: "assistant", content: text };
+          const createdAt = createdAtOf(event);
+          if (createdAt) payload.created_at = createdAt;
+          if (cfg.peerId) payload.peer_id = cfg.peerId;
+          state.pending.push(payload);
           if (state.pending.length > CAPTURE_BUFFER_LIMIT) {
             state.pending.splice(0, state.pending.length - CAPTURE_BUFFER_LIMIT);
           }
@@ -129,11 +208,11 @@ export function createSessionTracker(ctx, cfg) {
         case "turn/end": {
           state.turnsSinceCommit += 1;
           if (state.turnsSinceCommit >= cfg.commitTurnThreshold) {
-            void commit(state).catch(() => {});
+            enqueueWrite(state, () => commit(state));
           } else if (cfg.commitTokenThreshold > 0) {
-            void maybeCommitByToken(state).catch(() => {});
+            enqueueWrite(state, () => maybeCommitByToken(state));
           } else {
-            void flush(state).catch(() => {});
+            enqueueWrite(state, () => sendPending(state));
           }
           return;
         }
@@ -149,15 +228,18 @@ export function createSessionTracker(ctx, cfg) {
       return state.ovSessionId;
     },
 
-    /** Detached best-effort flush+commit at agent disposal. */
+    /** Detached best-effort flush+commit at agent disposal (bounded timeout). */
     onAgentDisposed(agent) {
       const session = agent.session;
       if (!session) return;
       if (!cfg.enabled || !cfg.autoCapture) return;
-      if (session.header?.parentSession && !cfg.captureSubagents) return;
+      if (isSubagent(session, cfg)) return;
       const state = stateFor(session);
-      void commit(state).catch(() => {});
-      states.delete(String(session.id));
+      const timeoutMs = Math.min(DISPOSE_COMMIT_TIMEOUT_MS, Number(cfg.timeoutMs) || DISPOSE_COMMIT_TIMEOUT_MS);
+      enqueueWrite(state, () => commit(state, { timeoutMs }));
+      state.writes.finally(() => {
+        if (states.get(String(session.id)) === state) states.delete(String(session.id));
+      });
     },
   };
 }
