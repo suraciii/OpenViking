@@ -220,7 +220,11 @@ export function createSessionTracker(ctx, cfg) {
         }
         case "turn/end": {
           state.turnsSinceCommit += 1;
-          if (state.turnsSinceCommit >= cfg.commitTurnThreshold) {
+          // Turn-threshold commits are opt-in (0 disables): the token
+          // threshold plus the disposal full-archive commit cover routine
+          // extraction; a turn counter would otherwise fire extraction tasks
+          // far more often than the ecosystem's token-only cadence.
+          if (cfg.commitTurnThreshold > 0 && state.turnsSinceCommit >= cfg.commitTurnThreshold) {
             enqueueWrite(state, () => commit(state));
           } else if (cfg.commitTokenThreshold > 0) {
             enqueueWrite(state, () => maybeCommitByToken(state));

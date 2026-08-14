@@ -7,13 +7,15 @@ import { createSessionTracker } from "../src/session.mjs";
 const SAVED_FETCH = globalThis.fetch;
 const calls = [];
 
-function stubFetch() {
+function stubFetch(responder) {
   globalThis.fetch = async (url, init = {}) => {
-    calls.push({ url: String(url), method: init.method || "GET", body: init.body });
+    const urlString = String(url);
+    calls.push({ url: urlString, method: init.method || "GET", body: init.body });
+    const response = responder ? await responder(urlString, init) : { result: {} };
     return {
-      ok: true,
-      status: 200,
-      json: async () => ({ result: {} }),
+      ok: response.ok !== false,
+      status: response.status ?? 200,
+      json: async () => response,
     };
   };
 }
@@ -248,6 +250,39 @@ test("captureMaxLength truncates over-long captured messages", async () => {
   const batch = calls.find((call) => call.url.includes("/messages/batch"));
   const payload = JSON.parse(batch.body);
   assert.equal(payload.messages[0].content.length, 50, "content truncated to captureMaxLength");
+});
+
+test("token threshold commits when pending_tokens cross the threshold", async () => {
+  stubFetch((url) => {
+    if (url.includes("/sessions/dsh-sess-1") && !url.includes("/commit") && !url.includes("/messages")) {
+      return { result: { pending_tokens: 50000 } };
+    }
+    return { result: {} };
+  });
+  const cfg = { enabled: true, autoCapture: true, commitTurnThreshold: 0, commitTokenThreshold: 1000 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, userEvent("lots of context"));
+  tracker.onSessionEvent(session, turnEndEvent(1));
+
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const commit = calls.find((call) => call.url.includes("/commit"));
+  assert.ok(commit, "expected a commit when pending_tokens exceed the threshold");
+});
+
+test("token threshold 0 disables threshold commits", async () => {
+  stubFetch();
+  const cfg = { enabled: true, autoCapture: true, commitTurnThreshold: 0, commitTokenThreshold: 0 };
+  const tracker = createSessionTracker({}, cfg);
+  const session = fakeSession();
+
+  tracker.onSessionEvent(session, userEvent("hello"));
+  tracker.onSessionEvent(session, turnEndEvent(1));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(calls.some((call) => call.url.includes("/messages/batch")), "flush still happens");
+  assert.ok(!calls.some((call) => call.url.includes("/commit")), "no commit without thresholds");
 });
 
 test("captures tool results via tool/call and tool/result events", async () => {

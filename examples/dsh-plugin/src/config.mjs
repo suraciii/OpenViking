@@ -95,8 +95,8 @@ export function resolveDshConfig(pluginConfig = {}) {
     timeoutMs: num(env.OPENVIKING_TIMEOUT_MS, pluginConfig.timeoutMs ?? 15000, 1000),
     commitTurnThreshold: num(
       env.OPENVIKING_COMMIT_TURN_THRESHOLD,
-      pluginConfig.commitTurnThreshold ?? 8,
-      1,
+      pluginConfig.commitTurnThreshold ?? 0,
+      0,
     ),
     commitTokenThreshold: num(
       env.OPENVIKING_COMMIT_TOKEN_THRESHOLD,
