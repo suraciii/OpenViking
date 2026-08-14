@@ -36,8 +36,8 @@ Credentials fall back to the `OPENVIKING_*` environment variables and then `~/.o
 
 ## What it does
 
-- **Auto-recall** — before each step admitting a real human prompt, retrieves relevant OpenViking context and injects it as a synthetic notice message, so the model sees memory for the current turn. The recall block is part of the session log (dsh records every pre-step message), satisfying dsh's model-visible ⟺ logged invariant.
-- **Session capture** — maps each dsh session to an OpenViking session (`dsh-<sessionId>`) and incrementally captures human user turns and assistant replies. Plugin-sourced injections (recalls, goal rounds, skill content) are not captured.
+- **Auto-recall** — before each step admitting a real human prompt, retrieves relevant OpenViking context and injects it as a synthetic notice message, so the model sees memory for the current turn. The recall block is part of the session log (dsh records every pre-step message), satisfying dsh's model-visible ⟺ logged invariant. Optional one-shot profile injection at session start (`profileInject`).
+- **Session capture** — maps each dsh session to an OpenViking session (`dsh-<sessionId>`) and incrementally captures human user turns and assistant replies. Plugin-sourced injections (recalls, goal rounds, skill content) are not captured; subagent sessions are skipped by default (`captureSubagents`).
 - **Commit for memory extraction** — flushes captured turns at every `turn/end` and commits every `commitTurnThreshold` turns and at agent disposal. Retryable failures go through the shared durable pending queue.
 - **Native tools** — `openviking_search`, `openviking_find`, `openviking_read`, `openviking_list`, `openviking_remember`, `openviking_commit`, `openviking_health`.
 - **viking:// URI guard** — denies local filesystem reads of `viking://` URIs and points the model back to the OpenViking tools.

@@ -17,9 +17,15 @@ function ovSessionIdFor(sessionId) {
   return `${PREFIX}-${safePart(sessionId)}`;
 }
 
-function textOf(message) {
+function textOf(message, cfg) {
   if (!message || !Array.isArray(message.content)) return "";
-  return extractTextFromContent(message.content);
+  if (cfg.captureTools) {
+    return extractTextFromContent(message.content, { toolMaxChars: cfg.captureToolMaxChars });
+  }
+  // Without captureTools, keep only plain text blocks: tool calls and their
+  // results would otherwise leak noisy internals into long-term memory.
+  const textBlocks = message.content.filter((block) => block?.type === "text");
+  return extractTextFromContent(textBlocks, { toolMaxChars: cfg.captureToolMaxChars });
 }
 
 /**
@@ -80,11 +86,15 @@ export function createSessionTracker(ctx, cfg) {
     /** Handle one `session/event` firehose event. */
     onSessionEvent(session, event) {
       if (!cfg.enabled || !cfg.autoCapture) return;
+      // Subagent sessions (header.parentSession set) are task-scoped workers;
+      // capturing them would flood memory with delegated-tool noise. Recall
+      // still runs for them; only capture is skipped unless opted in.
+      if (session.header?.parentSession && !cfg.captureSubagents) return;
       const state = stateFor(session);
       switch (event.type) {
         case "user/message": {
           if (event.data.source?.kind !== "user") return;
-          const text = textOf(event.data);
+          const text = textOf(event.data, cfg);
           if (!text.trim()) return;
           state.pending.push({ role: "user", content: text });
           if (state.pending.length > CAPTURE_BUFFER_LIMIT) {
@@ -93,7 +103,7 @@ export function createSessionTracker(ctx, cfg) {
           return;
         }
         case "assistant/message": {
-          const text = textOf(event.data.message);
+          const text = textOf(event.data.message, cfg);
           if (!text.trim()) return;
           state.pending.push({ role: "assistant", content: text });
           if (state.pending.length > CAPTURE_BUFFER_LIMIT) {
@@ -127,6 +137,7 @@ export function createSessionTracker(ctx, cfg) {
       const session = agent.session;
       if (!session) return;
       if (!cfg.enabled || !cfg.autoCapture) return;
+      if (session.header?.parentSession && !cfg.captureSubagents) return;
       const state = stateFor(session);
       void commit(state).catch(() => {});
       states.delete(String(session.id));

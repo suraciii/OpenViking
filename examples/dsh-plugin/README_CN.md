@@ -59,6 +59,13 @@
 | `recallTokenBudget` | `2000` | 召回 token 预算(`OPENVIKING_RECALL_TOKEN_BUDGET`) |
 | `scoreThreshold` | `0.35` | 最低相似度(`OPENVIKING_SCORE_THRESHOLD`) |
 | `recallPeerScope` | `all` | `actor` 表示工作区隔离召回(`OPENVIKING_RECALL_PEER_SCOPE`) |
+| `recallQueryExpansion` | `auto` | `off` 关闭服务端查询扩展的模型调用(`OPENVIKING_RECALL_QUERY_EXPANSION`) |
+| `minQueryLength` | `3` | 更短的人类消息跳过召回(`OPENVIKING_RECALL_MIN_QUERY_LENGTH`) |
+| `profileInject` | `false` | 会话开始时注入一次性用户档案块(`OPENVIKING_PROFILE_INJECT`) |
+| `profileTokenBudget` | `4000` | 注入档案的 token 预算(`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
+| `captureSubagents` | `false` | 同时捕获子代理会话;默认关闭以避免委派任务噪音(`OPENVIKING_CAPTURE_SUBAGENTS`) |
+| `captureTools` | `false` | 捕获回合中包含工具调用/结果文本(`OPENVIKING_CAPTURE_TOOLS`) |
+| `captureToolMaxChars` | `2000` | `captureTools` 开启时单个工具的截断长度(`OPENVIKING_CAPTURE_TOOL_MAX_CHARS`) |
 | `timeoutMs` | `15000` | 单请求超时(`OPENVIKING_TIMEOUT_MS`) |
 | `uriGuard` | `true` | 拒绝本地读取 `viking://` URI |
 | `debug` | `false` | 结构化调试日志(`OPENVIKING_DEBUG`) |

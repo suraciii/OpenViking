@@ -57,6 +57,31 @@ export function resolveDshConfig(pluginConfig = {}) {
     recallPeerScope:
       String(env.OPENVIKING_RECALL_PEER_SCOPE || pluginConfig.recallPeerScope || "all")
         .toLowerCase() === "actor" ? "actor" : "all",
+    // Server-side query expansion costs a model call before retrieval; expose
+    // the same opt-out the pi extension ships. Only sent when configured.
+    recallQueryExpansion:
+      String(env.OPENVIKING_RECALL_QUERY_EXPANSION || pluginConfig.recallQueryExpansion || "auto")
+        .toLowerCase() === "off" ? "off" : "auto",
+    recallQueryExpansionConfigured: Boolean(
+      env.OPENVIKING_RECALL_QUERY_EXPANSION
+      || pluginConfig.recallQueryExpansion,
+    ),
+    minQueryLength: num(env.OPENVIKING_RECALL_MIN_QUERY_LENGTH, pluginConfig.minQueryLength ?? 3, 0),
+    profileInject: bool(env.OPENVIKING_PROFILE_INJECT, pluginConfig.profileInject ?? false),
+    profileTokenBudget: num(
+      env.OPENVIKING_PROFILE_TOKEN_BUDGET,
+      pluginConfig.profileTokenBudget ?? 4000,
+      200,
+    ),
+    captureSubagents: bool(
+      env.OPENVIKING_CAPTURE_SUBAGENTS,
+      pluginConfig.captureSubagents ?? false,
+    ),
+    captureToolMaxChars: num(
+      env.OPENVIKING_CAPTURE_TOOL_MAX_CHARS,
+      pluginConfig.captureToolMaxChars ?? 2000,
+      100,
+    ),
     timeoutMs: num(env.OPENVIKING_TIMEOUT_MS, pluginConfig.timeoutMs ?? 15000, 1000),
     commitTurnThreshold: num(
       env.OPENVIKING_COMMIT_TURN_THRESHOLD,

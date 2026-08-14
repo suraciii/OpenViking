@@ -36,8 +36,8 @@
 
 ## 功能
 
-- **自动召回** — 在每个包含真实人类消息的 step 开始前,检索相关 OpenViking 上下文并以合成 notice 消息注入,让模型在当前回合看到记忆。召回块写入会话日志(dsh 会记录 pre-step 的每条消息),满足 dsh 的"模型可见 ⟺ 已记录"不变量。
-- **会话捕获** — 每个 dsh 会话映射到一个 OpenViking 会话(`dsh-<sessionId>`),增量捕获人类用户回合与助手回复;插件来源的注入(召回、goal 轮次、skill 内容)不会被捕获。
+- **自动召回** — 在每个包含真实人类消息的 step 开始前,检索相关 OpenViking 上下文并以合成 notice 消息注入,让模型在当前回合看到记忆。召回块写入会话日志(dsh 会记录 pre-step 的每条消息),满足 dsh 的"模型可见 ⟺ 已记录"不变量。可选会话开始时的用户档案注入(`profileInject`)。
+- **会话捕获** — 每个 dsh 会话映射到一个 OpenViking 会话(`dsh-<sessionId>`),增量捕获人类用户回合与助手回复;插件来源的注入(召回、goal 轮次、skill 内容)不会被捕获;子代理会话默认跳过(`captureSubagents`)。
 - **提交触发记忆提取** — 每个 `turn/end` 冲刷捕获消息,每 `commitTurnThreshold` 个回合及 agent 销毁时提交;可重试失败进入共享的持久化 pending 队列。
 - **原生工具** — `openviking_search`、`openviking_find`、`openviking_read`、`openviking_list`、`openviking_remember`、`openviking_commit`、`openviking_health`。
 - **viking:// URI 守卫** — 拒绝本地文件系统直接读取 `viking://` URI,并引导模型使用 OpenViking 工具。

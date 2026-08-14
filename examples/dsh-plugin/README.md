@@ -85,6 +85,13 @@ other memory plugins.
 | `recallTokenBudget` | `2000` | Recall token budget (`OPENVIKING_RECALL_TOKEN_BUDGET`) |
 | `scoreThreshold` | `0.35` | Minimum similarity score (`OPENVIKING_SCORE_THRESHOLD`) |
 | `recallPeerScope` | `all` | `actor` for workspace-isolated recall (`OPENVIKING_RECALL_PEER_SCOPE`) |
+| `recallQueryExpansion` | `auto` | `off` disables the server-side query-expansion model call (`OPENVIKING_RECALL_QUERY_EXPANSION`) |
+| `minQueryLength` | `3` | Skip recall for shorter human prompts (`OPENVIKING_RECALL_MIN_QUERY_LENGTH`) |
+| `profileInject` | `false` | Inject the one-shot user profile block at session start (`OPENVIKING_PROFILE_INJECT`) |
+| `profileTokenBudget` | `4000` | Token budget for the injected profile (`OPENVIKING_PROFILE_TOKEN_BUDGET`) |
+| `captureSubagents` | `false` | Also capture subagent sessions; off by default to avoid delegated-task noise (`OPENVIKING_CAPTURE_SUBAGENTS`) |
+| `captureTools` | `false` | Include tool call/result text in captured turns (`OPENVIKING_CAPTURE_TOOLS`) |
+| `captureToolMaxChars` | `2000` | Per-tool truncation when `captureTools` is on (`OPENVIKING_CAPTURE_TOOL_MAX_CHARS`) |
 | `timeoutMs` | `15000` | Per-request timeout (`OPENVIKING_TIMEOUT_MS`) |
 | `uriGuard` | `true` | Deny local reads of `viking://` URIs |
 | `debug` | `false` | Structured debug log (`OPENVIKING_DEBUG`) |
